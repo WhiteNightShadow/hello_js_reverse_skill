@@ -17,6 +17,7 @@ argument-hint: "<目标URL> [需要分析的加密参数名, 如 sign, m, token]
 你拥有两个 MCP 工具集：
 
 1. **js-reverse MCP**：JS 源码的静态分析利器
+   - `list_pages` / `select_page`：列出并选择已打开的浏览器页面
    - `search_in_sources`：在所有已加载 JS 中搜索关键词（参数名、加密函数特征）
    - `get_script_source` / `save_script_source`：获取/保存脚本源码
    - `set_breakpoint_on_text`：按代码文本设置断点
@@ -30,7 +31,8 @@ argument-hint: "<目标URL> [需要分析的加密参数名, 如 sign, m, token]
    - `list_websocket_connections` / `analyze_websocket_messages`：WebSocket 分析
 
 2. **chrome-devtools MCP**：浏览器自动化与交互
-   - `new_page` / `navigate_page`：页面导航
+   - `list_pages` / `select_page`：列出并选择已打开的浏览器页面
+   - `new_page` / `navigate_page`：页面导航（仅在无合适已有页面时使用）
    - `click` / `fill` / `type_text`：UI 交互
    - `evaluate_script`：执行 JS 脚本
    - `list_network_requests` / `get_network_request`：网络请求（含响应体保存）
@@ -38,29 +40,80 @@ argument-hint: "<目标URL> [需要分析的加密参数名, 如 sign, m, token]
    - `emulate`：模拟 User-Agent、视口、网络条件
    - `wait_for`：等待页面元素/文本
 
-**原则：能用 MCP 就不手动，能自动化就不要求用户操作。两个 MCP 交替配合形成分析闭环。**
+**核心原则：**
+1. **真实浏览器优先**：所有调试操作必须首先在用户已打开的真实 Chrome 浏览器上执行，直接连接并操作真实页面
+2. **能用 MCP 就不手动**：能自动化就不要求用户操作
+3. **两个 MCP 交替配合**：形成分析闭环
+
+## 浏览器连接策略（最高优先级）
+
+**每次任务开始时，必须执行以下连接流程，禁止跳过：**
+
+### 连接流程
+
+```
+步骤 1: 列出已有页面
+  - [js-reverse] list_pages → 获取真实浏览器中所有已打开的页面列表
+  - [chrome-devtools] list_pages → 同步获取页面列表
+
+步骤 2: 匹配目标页面
+  - 遍历页面列表，按以下优先级匹配：
+    ① URL 完全匹配目标网站的页面
+    ② URL 域名匹配目标网站的页面
+    ③ 用户正在浏览/交互的活跃页面
+  - 如果找到匹配页面 → 步骤 3
+  - 如果没有匹配页面 → 步骤 4
+
+步骤 3: 选择已有页面（优先路径）
+  - [js-reverse] select_page(pageIdx=匹配页面索引)
+  - [chrome-devtools] select_page(pageId=匹配页面ID, bringToFront=true)
+  - 确认选择成功后，直接进入后续分析阶段
+  - 注意：两个 MCP 的 select_page 参数不同：
+    - js-reverse 使用 pageIdx（页面索引）
+    - chrome-devtools 使用 pageId（页面ID）
+
+步骤 4: 仅在无匹配页面时创建新标签页（降级方案）
+  - 告知用户：未找到目标页面，将创建新标签页
+  - [chrome-devtools] new_page(url="目标URL")
+  - 或 [js-reverse] new_page(url="目标URL")
+```
+
+### 关键规则
+
+1. **绝对禁止**在未执行 `list_pages` 检查的情况下直接调用 `new_page`
+2. 用户已打开目标网站时，**必须复用已有页面**，不得创建重复标签页
+3. 在真实浏览器页面上执行的所有操作（断点、Hook、脚本注入）都会**即时生效**在用户可见的页面上
+4. 使用 `select_page` 选中页面后，后续所有 MCP 操作都在该页面上下文中执行
+5. 如果用户在真实浏览器中手动切换了页面，需要重新 `list_pages` + `select_page` 确认当前上下文
 
 ## 工作流程
 
-### Phase 0：任务理解与项目初始化
+### Phase 0：任务理解与浏览器连接
 
 收到用户的目标 URL 和分析需求后：
 
 1. 明确分析目标：需要还原哪些加密参数、目标数据是什么
-2. 创建项目目录（以目标网站/功能命名），结构参考 `templates/` 下的模板
-3. 确认 MCP 工具可用：调用 `list_pages` 验证浏览器连接
+2. **连接真实浏览器**（按「浏览器连接策略」执行）：
+   - 调用 `list_pages` 列出用户真实 Chrome 中已打开的所有页面
+   - 查找并 `select_page` 选中目标页面（优先复用已有页面）
+   - 仅在未找到目标页面时才 `new_page` 创建新标签页
+3. 创建项目目录（以目标网站/功能命名），结构参考 `templates/` 下的模板
 
 ### Phase 1：目标侦察（自动执行）
 
 使用 MCP 工具完成以下侦察，**不需要用户手动操作**：
 
-#### 1.1 页面加载与观察
+#### 1.1 连接页面与观察
 
 ```
 Actions:
-  - [chrome-devtools] new_page → 打开目标 URL
-  - [chrome-devtools] take_snapshot → 获取页面结构和内容
-  - [chrome-devtools] take_screenshot → 截取页面视觉状态
+  - Phase 0 中已通过 list_pages + select_page 连接到真实浏览器页面
+  - 如果页面已在目标状态，直接开始观察，无需重新加载
+  - [chrome-devtools] take_snapshot → 获取当前页面结构和内容
+  - [chrome-devtools] take_screenshot → 截取当前页面视觉状态
+  - 如需导航到特定子页面：[chrome-devtools] navigate_page(type="url", url="目标子页面")
+  
+  注意：不要使用 new_page，在已选中的真实页面上直接操作
 ```
 
 #### 1.2 网络请求捕获
@@ -116,15 +169,19 @@ Headers：
   3. [如：AES-CBC加密]
 ```
 
-### Phase 2：静态分析（使用 js-reverse MCP）
+### Phase 2：静态分析（在真实浏览器上使用 js-reverse MCP）
 
-根据 Phase 1 识别到的加密参数，深入 JS 源码：
+根据 Phase 1 识别到的加密参数，在用户已打开的真实浏览器页面上深入 JS 源码：
+
+**前置确认**：确保 js-reverse MCP 已通过 `select_page` 选中正确的真实浏览器页面。
+如果不确定，先 `list_pages` 重新确认页面状态。
 
 #### 2.1 关键词搜索定位
 
 ```
 Actions:
   - [js-reverse] search_in_sources(query="加密参数名")
+    → 直接在真实浏览器已加载的 JS 源码中搜索，结果即为用户实际看到的页面代码
   - [js-reverse] search_in_sources(query="encrypt|sign|token|md5|sha|aes|des|rsa|hmac|btoa|atob|CryptoJS")
   - [js-reverse] search_in_sources(query="XMLHttpRequest|$.ajax|fetch|beforeSend")
   - [js-reverse] search_in_sources(query="document.cookie")
@@ -178,9 +235,12 @@ Actions:
   - 用中文注释标注每个函数的作用、输入输出
 ```
 
-### Phase 3：动态验证（js-reverse + chrome-devtools 配合）
+### Phase 3：动态验证（在真实浏览器上 js-reverse + chrome-devtools 配合）
 
-对静态分析的结论进行运行时验证：
+对静态分析的结论，在用户真实浏览器页面上进行运行时验证：
+
+**前置确认**：确保两个 MCP 都已 `select_page` 选中同一个真实浏览器页面。
+所有断点、Hook、脚本执行都会直接作用于用户可见的真实页面。
 
 #### 3.1 Hook 注入验证
 
@@ -194,8 +254,10 @@ Actions:
     ③ 加密函数 Hook — 记录入参和返回值
     ④ eval/Function Hook — 捕获动态代码
     
-  - [js-reverse] navigate_page(type="reload") → 重新加载触发 Hook
+  - [js-reverse] navigate_page(type="reload") → 在真实浏览器中重新加载触发 Hook
   - [js-reverse] list_console_messages → 读取 Hook 输出
+  
+  注意：Hook 注入后需要 reload，会刷新用户的真实页面，必要时提前告知用户
 ```
 
 #### 3.2 断点调试确认
@@ -203,7 +265,10 @@ Actions:
 ```
 Actions:
   - [js-reverse] set_breakpoint_on_text(text="关键代码片段")
-  - 触发目标操作（翻页、提交等）
+    → 断点直接设置在真实浏览器的 DevTools 中，用户可以在浏览器中看到断点标记
+  - 触发目标操作：
+    优先方式：在真实浏览器中直接操作（用户手动点击、或通过 chrome-devtools 的 click/fill 模拟）
+    确保触发的是真实用户行为产生的请求
   - [js-reverse] get_paused_info → 确认运行时变量值
   - [js-reverse] step_into / step_over → 单步跟踪执行流程
   
@@ -218,9 +283,12 @@ Actions:
 
 ```
 Actions:
-  - [chrome-devtools] evaluate_script → 触发多次数据请求
-  - [js-reverse] list_network_requests → 收集多次请求
+  - [chrome-devtools] evaluate_script → 在真实页面上触发多次数据请求
+    或引导用户在真实浏览器中手动执行翻页等操作
+  - [js-reverse] list_network_requests → 收集真实浏览器产生的网络请求
   - 对比加密参数变化规律，确认变化因子
+  
+  优势：在真实浏览器中触发的请求，环境完全真实，不存在环境差异导致的误判
 ```
 
 ### Phase 4：Node.js 算法还原
@@ -385,26 +453,31 @@ MCP 操作：
 ### MCP 工具配合模式
 
 ```
-静态定位 → 动态验证 → 补充分析 → 再次验证
-    ↓           ↓           ↓           ↓
-js-reverse  js-reverse  js-reverse  js-reverse
-搜索源码    设置断点    扩展搜索    trace函数
-            获取变量    读取更多源码
+连接真实浏览器 → 静态定位 → 动态验证 → 补充分析 → 再次验证
+      ↓              ↓           ↓           ↓           ↓
+  list_pages     js-reverse  js-reverse  js-reverse  js-reverse
+  select_page    搜索源码    设置断点    扩展搜索    trace函数
+  (两个MCP都选中              获取变量    读取更多源码
+   同一真实页面)
+
+所有操作均在用户已打开的真实 Chrome 页面上执行
 ```
 
 ### 效率原则
 
-1. **先 Network 后 Sources**：先确定数据接口和参数格式，再去源码中搜索
-2. **先验证 I/O 后反编译**：确认函数输入输出正确，不要通读混淆代码
-3. **先找骨架函数后读细节**：搜索关键词锁定入口，不要通读全部代码
-4. **先纯请求后浏览器**：先尝试最轻量的方案，失败再升级
-5. **先判断真假分支后还原算法**：混淆代码可能有大量死代码
+1. **先连接后操作**：任何分析前必须先 `list_pages` + `select_page` 连接真实浏览器
+2. **先 Network 后 Sources**：先确定数据接口和参数格式，再去源码中搜索
+3. **先验证 I/O 后反编译**：确认函数输入输出正确，不要通读混淆代码
+4. **先找骨架函数后读细节**：搜索关键词锁定入口，不要通读全部代码
+5. **先纯请求后浏览器**：先尝试最轻量的方案，失败再升级
+6. **先判断真假分支后还原算法**：混淆代码可能有大量死代码
 
 ### 调试方法论
 
-1. **五步定位法**：
-   - Network 面板 → 找数据接口和参数格式
-   - `search_in_sources` → 搜索关键词定位源码
+1. **六步定位法**：
+   - **连接真实浏览器** → `list_pages` + `select_page` 选中用户已打开的目标页面
+   - Network 面板 → 找数据接口和参数格式（真实浏览器产生的请求）
+   - `search_in_sources` → 搜索关键词定位源码（真实页面已加载的脚本）
    - 定位入口函数 → `beforeSend`、`$.ajax`、`fetch`、`XMLHttpRequest.open`
    - 追踪调用链 → 从入口向上找参数生成逻辑
    - 验证算法 → 用已知输入输出验证还原结果
