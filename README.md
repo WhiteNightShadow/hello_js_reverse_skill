@@ -10,12 +10,13 @@
 - **WASM 逆向**: WebAssembly 加密模块的加载、环境补全和调用
 - **协议层对抗**: TLS 指纹检测、HTTP/2 强制、频率限制等协议层防护的应对
 - **MCP 工具深度集成**: 源码搜索、断点调试、Hook注入、网络监听全自动化
+- **Codex/Claude Code 完整适配**: 内置 Agent 授权指令框架，解决 AI 编码工具在签名分析、接口调试等场景下的安全策略限制，确保 AI 全力协助完成分析任务
 
-## 一键使用
+## 快速使用
 
 ### 方式一：AI 对话框直接安装（推荐）
 
-在你的 AI 编码工具（Cursor / Claude Code / Windsurf 等）的对话框中输入：
+在你的 AI 编码工具（Cursor / Claude Code / codex 等）的对话框中输入：
 
 ```
 请帮我配置skill并在后续触发相关操作的时候查阅该skill：https://github.com/WhiteNightShadow/hello_js_reverse_skill
