@@ -170,7 +170,7 @@ python main.py
 
 ## MCP 工具集成
 
-本 Skill 只围绕 `camoufox-reverse` MCP 服务器组织能力（Camoufox 反检测浏览器，52 个工具）：
+本 Skill 只围绕 [`camoufox-reverse` MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) 服务器组织能力（Camoufox 反检测浏览器，52 个工具）：
 
 | 核心工具 | 用途 |
 |---------|------|
@@ -237,4 +237,4 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **camoufox-reverse MCP**: 反检测浏览器逆向分析（52 个工具，含 JSVMP 专项分析）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp)**: 反检测浏览器逆向分析（52 个工具，含 JSVMP 专项分析）
