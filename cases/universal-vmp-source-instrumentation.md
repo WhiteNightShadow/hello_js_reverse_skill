@@ -1,6 +1,6 @@
 # 案例：通用 VMP 源码级插桩（骨架模板）
 
-> **v2.5.0 骨架案例**。本文是一个**方法论模板**，不是某个具体站点的案例。适用于：瑞数 5/6、Akamai sensor_data v2/v3、TikTok webmssdk、obfuscator.io 等所有"算法封装在字节码 dispatch 循环里"的 VMP。
+> **v2.5.0 骨架案例**。本文是一个**方法论模板**，不是某个具体站点的案例。适用于：瑞数 5/6、Akamai sensor_data v2/v3、webmssdk、obfuscator.io 等所有"算法封装在字节码 dispatch 循环里"的 VMP。
 >
 > 使用方式：
 >
@@ -199,7 +199,7 @@ function genSign(input) {
 | 瑞数 5 | 固定 `sdenv-*.js` 命名 | url_pattern 用 `**/sdenv-*.js` |
 | 瑞数 6 | 脚本名每次不同 + 多层 VMP | 先 `list_network_requests` 找所有 100KB+ JS，逐个 instrument（tag 区分） |
 | Akamai sensor_data | `_abck` / `bm_sz` cookie | 重点看 `hot_keys` 中 touch/mouse 事件相关属性 |
-| webmssdk（TikTok） | 配合 msToken 预热 | 需先让 `/v1/generate_token` 预热接口完成再触发业务 |
+| webmssdk（短视频平台） | 配合 msToken 预热 | 需先让 `/v1/generate_token` 预热接口完成再触发业务 |
 | obfuscator.io（开源） | case 数可能只有 20-30 | `find_dispatch_loops(min_case_count=15)` |
 
 ---

@@ -102,7 +102,7 @@
   window 仅出现 3 次（环境访问全部通过 JSVMP 字节码间接进行）。
 
 步骤 8: 补环境方案选型
-  参考 ctl456/ruishu6-yaojianju（手动补环境）和 warterbili/ruishu-re（sdenv/纯算/JsRpc 多方案），
+  参考开源社区的手动补环境方案和 sdenv/纯算/JsRpc 多方案，
   确定 sdenv（魔改 jsdom + C++ V8 Addon）是瑞数6的最优纯 Node.js 方案。
 ```
 

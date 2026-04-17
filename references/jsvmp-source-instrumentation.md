@@ -10,7 +10,7 @@
 
 ### 1.1 传统 hook 的盲区
 
-**`hook_jsvmp_interpreter`** 即使升级到 v0.4.0 的多路径版本（apply/call/bind + Reflect.*/Proxy 全局对象 + timing/random），仍然只能看到 VMP 路由到**可 hook JS API** 的部分。但瑞数 5/6、Akamai sensor_data v2/v3、webmssdk（TikTok）、obfuscator.io 这类 VMP 的典型结构是：
+**`hook_jsvmp_interpreter`** 即使升级到 v0.4.0 的多路径版本（apply/call/bind + Reflect.*/Proxy 全局对象 + timing/random），仍然只能看到 VMP 路由到**可 hook JS API** 的部分。但瑞数 5/6、Akamai sensor_data v2/v3、webmssdk（短视频平台）、obfuscator.io 这类 VMP 的典型结构是：
 
 ```js
 // 典型的自包含 VMP 字节码分发循环
