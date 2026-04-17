@@ -16,8 +16,8 @@ Hook 是 JS 逆向中最核心的技术之一。通过劫持/拦截 JS 原生函
 [camoufox-reverse] evaluate_js(expression=HookScript)
 → 在当前页面上下文执行，适合页面已加载后的动态注入
 
-[camoufox-reverse] inject_hook_preset(preset="xhr|fetch|crypto|websocket|debugger_bypass")
-→ 一键注入预设 Hook，覆盖常见逆向场景
+[camoufox-reverse] inject_hook_preset(preset="xhr|fetch|crypto|websocket|debugger_bypass|cookie|runtime_probe")
+→ 一键注入预设 Hook，覆盖常见逆向场景（v2.5.0 新增 cookie / runtime_probe 两个预设）
 
 [camoufox-reverse] hook_function(function_path="目标函数", hook_code="...", position="before|after|replace")
 → 对指定函数注入自定义 Hook
@@ -390,9 +390,130 @@ Hook 是 JS 逆向中最核心的技术之一。通过劫持/拦截 JS 原生函
 ## MCP 注入最佳实践
 
 1. **使用 `add_init_script`**：确保 Hook 在目标代码之前生效
-2. **优先使用 `inject_hook_preset`**：一键注入 xhr/fetch/crypto/websocket/debugger_bypass 预设 Hook
+2. **优先使用 `inject_hook_preset`**：一键注入 xhr/fetch/crypto/websocket/debugger_bypass/cookie/runtime_probe 预设 Hook（v2.5.0 更新）
 3. **使用 `hook_function`**：对特定函数注入 before/after/replace Hook
 4. **使用 `console.log` 输出**：通过 `get_console_logs` 收集结果
 5. **使用 `console.trace`**：在关键点输出调用栈
 6. **Camoufox 优势**：Juggler 协议沙箱隔离，Hook 不会被页面 JS 检测到
 7. **使用 Proxy 代替直接覆写**：更隐蔽，不改变 `typeof` 结果
+8. **首屏挑战页用 `navigate(pre_inject_hooks=[...])`** [v2.5.0]：瑞数/Akamai 首包挑战在 hook 装好前就跑完了，用这个参数让 hook 先装再 goto
+9. **装完 hook 想让它先于页面 JS 跑**：用 `reload_with_hooks()` [v2.5.0] 替代裸 `reload()`，同时会清掉各类 `__mcp_*_log`
+
+---
+
+## cookie 预设：原型链级 document.cookie Hook（v2.5.0 新增）
+
+### 为什么不能直接 `Object.defineProperty(document, 'cookie', ...)`
+
+`document.cookie` 的 getter/setter 定义在**原型链**上（具体是 `Document.prototype` 或 `HTMLDocument.prototype`），不在 `document` 实例上。直接在实例上 defineProperty 会被浏览器忽略或抛错——这是很多自写 Hook 脚本"看起来装上了但完全抓不到 cookie 写入"的根本原因。
+
+### 正确做法（cookie_hook.js 的实现）
+
+```javascript
+// 沿原型链找到定义 cookie 描述符的 owner
+function findCookieDescriptor() {
+    var proto = Object.getPrototypeOf(document);
+    while (proto) {
+        var d = Object.getOwnPropertyDescriptor(proto, 'cookie');
+        if (d) return { descriptor: d, owner: proto };
+        proto = Object.getPrototypeOf(proto);
+    }
+    return null;
+}
+
+var found = findCookieDescriptor();
+if (!found) return;
+
+var origSet = found.descriptor.set;
+var origGet = found.descriptor.get;
+
+// 在正确的 owner 上替换（关键：owner 是 Document.prototype 或 HTMLDocument.prototype）
+Object.defineProperty(found.owner, 'cookie', {
+    set: function (value) {
+        window.__mcp_cookie_log.push({
+            op: 'set', value: String(value),
+            stack: new Error().stack, ts: Date.now()
+        });
+        return origSet.call(this, value);
+    },
+    get: function () {
+        var v = origGet.call(this);
+        window.__mcp_cookie_log.push({
+            op: 'get', value: String(v),
+            stack: new Error().stack, ts: Date.now()
+        });
+        return v;
+    },
+    configurable: true, enumerable: true
+});
+```
+
+### 使用方式（三步）
+
+```
+# 1. 注入（默认持久化）
+[camoufox-reverse] inject_hook_preset(preset="cookie", persistent=True)
+
+# 2. 触发场景
+
+# 3. 拉日志（两种方式）
+# a. 读原始日志
+[camoufox-reverse] evaluate_js(expression="JSON.stringify(window.__mcp_cookie_log.slice(-20))")
+
+# b. 或直接走 Cookie 归因（推荐）
+[camoufox-reverse] analyze_cookie_sources(name_filter="目标cookie名")
+```
+
+### 适用场景
+
+- 所有涉及 JS 写入 cookie 的场景（eval 首包、指纹 cookie、JS 计算 token 后 `document.cookie = ...`）
+- **不适用**：HTTP Set-Cookie 写入的场景（这种用 `analyze_cookie_sources` 的 http_responses 分支）
+
+---
+
+## runtime_probe 预设：低开销广谱运行时探针（v2.5.0 新增）
+
+### 与 jsvmp_hook 的区别
+
+| 维度 | `jsvmp_hook`（`hook_jsvmp_interpreter`） | `runtime_probe` |
+|------|---------------------------------------|----------------|
+| 实现方式 | 在 navigator/screen 等全局对象上装 **Proxy** | **不装 Proxy**，只 override 具体热点 API |
+| 开销 | 高（每次属性读取都进 Proxy trap） | 低（只在调用热点 API 时记录） |
+| 覆盖面 | 全局对象所有属性 + apply/call/bind/Reflect.* | 固定一组 API |
+| 安全性 | 个别页面可能被 Proxy 破坏 | 非常安全 |
+| 典型用途 | JSVMP 深度分析 | "这个页面都在做什么"快速摸底 |
+
+### runtime_probe 覆盖的 API 清单
+
+| 类别 | 覆盖项 | 日志 type |
+|------|-------|----------|
+| XHR | `XMLHttpRequest.prototype.open/send` | `xhr_open` / `xhr_send` |
+| fetch | `window.fetch` | `fetch` |
+| Canvas 指纹 | `HTMLCanvasElement.prototype.toDataURL` | `canvas_toDataURL` |
+| Canvas 上下文 | `HTMLCanvasElement.prototype.getContext` | `canvas_getContext` |
+| WebGL | `WebGLRenderingContext.prototype.getParameter` | `webgl_getParameter` |
+| navigator | userAgent / platform / language / languages / webdriver / hardwareConcurrency / deviceMemory / vendor / appVersion / plugins / mimeTypes 的 getter | `nav_read` |
+| 事件 | `EventTarget.prototype.addEventListener`（只记 mouse/key/devicemotion 等 bot 检测类） | `addEventListener` |
+
+### 使用方式
+
+```
+# 1. 注入
+[camoufox-reverse] inject_hook_preset(preset="runtime_probe", persistent=True)
+
+# 2. 触发场景
+
+# 3. 拉日志（自动按 type 聚合）
+[camoufox-reverse] get_runtime_probe_log(limit=300)
+
+# 按类型过滤
+[camoufox-reverse] get_runtime_probe_log(type_filter="canvas_toDataURL", limit=50)
+[camoufox-reverse] get_runtime_probe_log(type_filter="xhr_send", limit=100)
+[camoufox-reverse] get_runtime_probe_log(type_filter="nav_read", limit=100)
+```
+
+### 典型诊断模式
+
+- **反爬是否做 canvas 指纹检测？** → 看 `by_type.canvas_toDataURL` 是否 > 0
+- **反爬是否读 navigator.webdriver？** → `get_runtime_probe_log(type_filter="nav_read")` 里找 `prop: "webdriver"`
+- **反爬是否检测鼠标移动？** → 看 `by_type.addEventListener` 里 mousemove/mousedown 的计数

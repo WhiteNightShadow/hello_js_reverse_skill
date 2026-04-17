@@ -7,7 +7,7 @@
 
 ## 工具速查表
 
-### camoufox-reverse MCP（52 个工具）
+### camoufox-reverse MCP（65 个工具，v0.4.0+）
 
 | 类别 | 工具 | 核心用途 |
 |------|------|---------|
@@ -47,6 +47,15 @@
 | **指纹** | `get_fingerprint_info` | 检查浏览器指纹 |
 | **反检测** | `check_detection` | 测试是否被反爬识别 |
 | **反调试** | `bypass_debugger_trap` | 绕过 debugger 陷阱 |
+| **分发循环扫描** | `find_dispatch_loops` | **[v0.4.0]** 定位字节码分发函数（while+switch，case 数过滤） |
+| **源码级插桩** | `instrument_jsvmp_source` | **[v0.4.0]** HTTP 层改写 VMP，每个 obj[key]/fn(args) 插入 tap（通用 VMP 利器） |
+| **插桩日志** | `get_instrumentation_log` | **[v0.4.0]** 拉取源码插桩日志，带 hot_keys/hot_methods/hot_functions 摘要 |
+| **插桩状态** | `get_instrumentation_status` / `stop_instrumentation` | **[v0.4.0]** 查看/停止源码插桩 |
+| **Cookie 归因** | `analyze_cookie_sources` | **[v0.4.0]** 融合 HTTP Set-Cookie + JS document.cookie + cookie jar |
+| **hook 重载** | `reload_with_hooks` | **[v0.4.0]** 重载使 persistent hook 先于页面 JS 执行（+ 清日志） |
+| **运行时探针日志** | `get_runtime_probe_log` | **[v0.4.0]** 获取 runtime_probe 预设的广谱事件日志 |
+| **预设 Hook（扩展）** | `inject_hook_preset("cookie")` / `inject_hook_preset("runtime_probe")` | **[v0.4.0]** 新增两个预设 |
+| **首屏注入** | `navigate(pre_inject_hooks=[...])` | **[v0.4.0]** 经 about:blank 装 hook 再 goto，解决首屏挑战页 |
 
 ## 场景化操作手册
 
@@ -204,6 +213,139 @@
   [camoufox-reverse] evaluate_js(expression="ws.send(JSON.stringify({...}))")
 ```
 
+### 场景 6：通用 JSVMP 源码级插桩（瑞数/Akamai/webmssdk）[v2.5.0 新增]
+
+**目标**：定位 VMP 读取的环境指纹集与调用的加密原语，不依赖 VMP 具体实现
+
+```
+步骤 1：启动浏览器 + 开启响应体捕获
+  [camoufox-reverse] launch_browser(headless=False)
+  [camoufox-reverse] start_network_capture(capture_body=True)
+
+步骤 2：第一次导航定位 VMP 脚本
+  [camoufox-reverse] navigate(url="https://target.com/")
+  [camoufox-reverse] list_network_requests(resource_type="script")
+  → 找最大的 JS（100KB+，通常是 sdenv-*.js / FuckCookie_*.js / webmssdk.es5.js）
+
+步骤 3：确认是 VMP
+  [camoufox-reverse] find_dispatch_loops(
+    script_url="https://target.com/xxx/sdenv-xxx.js",
+    min_case_count=20
+  )
+  → case_count > 50 基本确认是 VMP
+
+步骤 4：装源码级插桩（核心）
+  [camoufox-reverse] instrument_jsvmp_source(
+    url_pattern="**/sdenv-*.js",
+    mode="ast",       # 能联网用 ast（99% 覆盖）；离线用 regex（80%）
+    tag="vmp1"
+  )
+
+步骤 5：兜底 hook
+  [camoufox-reverse] inject_hook_preset(preset="cookie", persistent=True)
+  [camoufox-reverse] inject_hook_preset(preset="xhr", persistent=True)
+  [camoufox-reverse] hook_jsvmp_interpreter(script_url="sdenv-")
+  [camoufox-reverse] bypass_debugger_trap()
+
+步骤 6：重载让插桩先于 VMP 生效
+  [camoufox-reverse] reload_with_hooks()
+
+步骤 7：触发业务操作（翻页 / 登录 / 搜索）
+
+步骤 8：读 hot_keys / hot_methods / hot_functions（30 秒读完 VMP 指纹）
+  [camoufox-reverse] get_instrumentation_log(
+    tag_filter="vmp1",
+    type_filter="tap_get",    # 所有 obj[key] 读取
+    limit=200
+  )
+  → summary.hot_keys: VMP 读了哪些属性（top 30，按频次）
+
+  [camoufox-reverse] get_instrumentation_log(
+    tag_filter="vmp1",
+    type_filter="tap_method",  # 所有 obj.method(args) 调用
+    limit=200
+  )
+  → summary.hot_methods: VMP 调了哪些方法（Array.prototype.join / CryptoJS.MD5 ...）
+
+  [camoufox-reverse] get_instrumentation_log(
+    tag_filter="vmp1",
+    type_filter="tap_call",   # 所有 fn(args) 直接调用
+    limit=200
+  )
+  → summary.hot_functions: VMP 调了哪些函数
+
+步骤 9：Cookie 归因
+  [camoufox-reverse] analyze_cookie_sources()
+  → 对每个 cookie 返回 sources（http_set_cookie / js_document_cookie）
+    + http_responses[].url + js_writes[].stack
+
+步骤 10：完工清理
+  [camoufox-reverse] stop_instrumentation(url_pattern="**/sdenv-*.js")
+  [camoufox-reverse] remove_hooks()
+```
+
+**判定与后续策略**：
+
+| hot_methods 包含 | hot_keys 环境属性数 | 策略 |
+|-----------------|---------------------|------|
+| CryptoJS.MD5 / SubtleCrypto.digest / btoa | 少（< 15） | 纯算法还原（Node.js crypto / Python hashlib） |
+| 大量自定义 fn 名 | 少（< 15） | 提取 VMP 子片段 + vm 沙箱 |
+| CryptoJS / SubtleCrypto | 多（40+） + cookie 来自 HTTP Set-Cookie | jsdom 环境伪装（走路径 B） |
+
+详细方法论见 `references/jsvmp-source-instrumentation.md`。
+
+### 场景 7：Cookie 归因分析 [v2.5.0 新增]
+
+**目标**：搞清楚某个 Cookie 到底是谁写的（JS / HTTP Set-Cookie / 混合）
+
+```
+步骤 1：启动环境 + 开启响应体捕获 + cookie hook
+  [camoufox-reverse] launch_browser(headless=False)
+  [camoufox-reverse] start_network_capture(capture_body=True)
+  [camoufox-reverse] inject_hook_preset(preset="cookie", persistent=True)   # 原型链级
+
+步骤 2：导航到目标（首屏有挑战用 pre_inject_hooks）
+  [camoufox-reverse] navigate(
+    url="https://target.com/",
+    pre_inject_hooks=["xhr", "fetch", "cookie"]
+  )
+
+步骤 3：触发可疑 Cookie 的生成场景（刷新 / 登录 / 点业务按钮）
+
+步骤 4：一把归因
+  [camoufox-reverse] analyze_cookie_sources(name_filter="acw_tc|NfBCSins|x-bogus")
+  → 返回：
+    {
+      "cookies": {
+        "acw_tc": {
+          "sources": ["http_set_cookie"],
+          "first_set_ts": ...,
+          "http_responses": [{"url": ".../challenge", "ts": ..., "header": "acw_tc=...; path=/"}],
+          "js_writes": [],
+          "current_value": "..."
+        },
+        "x-bogus-js": {
+          "sources": ["js_document_cookie"],
+          "first_set_ts": ...,
+          "http_responses": [],
+          "js_writes": [{"value": "x-bogus-js=...", "stack": "...encrypt@webmssdk.es5.js:..."}],
+          "current_value": "..."
+        }
+      },
+      "total_cookies": 2
+    }
+
+步骤 5：按归因结果进一步分析
+  a. 纯 http_set_cookie → 看 http_responses[].url 是哪个接口，它的请求体里有什么签名参数
+     → 用场景 1 分析那个接口的加密参数
+  b. 纯 js_document_cookie → 看 js_writes[].stack 定位写入函数，search_code 打开源码
+  c. 两者都有 → 两步都做（JS 算 token POST 给服务端，服务端 Set-Cookie 回来）
+```
+
+**关键洞察**：
+
+> 对于瑞数、Akamai 这类"JS 算 token、服务端 Set-Cookie"的混合模式，单纯 `hook_function(Document.prototype.cookie)` 是抓不到最终 cookie 写入的——因为它是 HTTP header 写的，不经过 JS。`analyze_cookie_sources` 的价值就是 30 秒内消除这个盲区。
+
 ## 高级技巧
 
 ### 使用 trace_function 自动记录函数调用
@@ -314,7 +456,109 @@
 [camoufox-reverse] intercept_request(url_pattern="**/api/*", action="mock", mock_response={"status": 200, "body": "{\"ok\":1}"})
 ```
 
-## camoufox-reverse MCP 工具分类总览（52 个）
+### 使用源码级插桩（v2.5.0 新增，通用 VMP 利器）
+
+```
+# 1. 先确认是不是 VMP（case_count > 50 基本是）
+[camoufox-reverse] find_dispatch_loops(script_url="https://target.com/sdenv-xxx.js", min_case_count=20)
+
+# 2. 装插桩（AST 模式优先，需 CDN；regex 模式兜底）
+[camoufox-reverse] instrument_jsvmp_source(
+    url_pattern="**/sdenv-*.js",    # glob 模式匹配多 hash 版本
+    mode="ast",                      # 或 "regex"
+    tag="vmp1",                      # 区分多 VMP 的标签
+    rewrite_member_access=True,      # 改写每个 obj[key]
+    rewrite_calls=True,              # 改写每个 fn(args) / obj.method(args)
+    max_rewrites=5000,               # 单文件改写上限
+    cache_rewritten=True             # 缓存改写后源码
+)
+
+# 3. 装完后必须重载让插桩生效
+[camoufox-reverse] reload_with_hooks()
+
+# 4. 触发操作后读日志
+[camoufox-reverse] get_instrumentation_log(tag_filter="vmp1", type_filter="tap_get", limit=200)
+  → summary.hot_keys 是 VMP 读取的环境属性 top 30（指纹学习金矿）
+
+[camoufox-reverse] get_instrumentation_log(tag_filter="vmp1", type_filter="tap_method", limit=200)
+  → summary.hot_methods 是 VMP 调用的方法 top 30（ObjectType.methodName 格式）
+
+# 5. 查看插桩状态
+[camoufox-reverse] get_instrumentation_status()
+
+# 6. 完工移除
+[camoufox-reverse] stop_instrumentation(url_pattern="**/sdenv-*.js")
+[camoufox-reverse] stop_instrumentation()    # 不传参数 = 全部停止
+```
+
+**与 hook_jsvmp_interpreter 的分工**：
+
+| 工具 | 能看到 | 看不到 |
+|------|--------|--------|
+| `hook_jsvmp_interpreter` | VMP 通过 `Function.prototype.apply/call/bind` 或 `Reflect.*` 调子函数，读全局对象属性（Proxy） | VMP 在 switch/case 内部直接 `obj[key]` / `fn(args)` 的调用 |
+| `instrument_jsvmp_source` | 每一次 member access + 每一次函数调用，无论是否通过可 hook API | 不跨脚本（只改写指定 url_pattern 的那个文件） |
+| **建议**：两者同时开，互相校验 | | |
+
+### 使用 Cookie 归因分析（v2.5.0 新增）
+
+```
+# 1. 前置条件：网络抓包 + cookie hook 同时开
+[camoufox-reverse] start_network_capture(capture_body=True)
+[camoufox-reverse] inject_hook_preset(preset="cookie", persistent=True)
+
+# 2. 触发场景
+
+# 3. 一键归因
+[camoufox-reverse] analyze_cookie_sources(name_filter="ttwid|msToken|acw_tc")
+
+返回字段：
+  cookies[name].sources: ["http_set_cookie" | "js_document_cookie"]   # 可能两者都有
+  cookies[name].first_set_ts: 首次观察到的毫秒时间戳
+  cookies[name].http_responses: [{url, ts, header}]                    # HTTP 写入来源
+  cookies[name].js_writes: [{value, stack, ts}]                        # JS 写入来源（含调用栈）
+  cookies[name].current_value: 当前 jar 中的值
+```
+
+### 使用 runtime_probe 做低开销广谱观察（v2.5.0 新增）
+
+```
+# runtime_probe 是 jsvmp_hook 的轻量版：不装 Proxy，只 override 具体热点 API
+[camoufox-reverse] inject_hook_preset(preset="runtime_probe", persistent=True)
+
+# 触发操作
+[camoufox-reverse] get_runtime_probe_log(type_filter="xhr_send", limit=100)
+[camoufox-reverse] get_runtime_probe_log(type_filter="canvas_toDataURL", limit=50)   # canvas 指纹检测
+[camoufox-reverse] get_runtime_probe_log(type_filter="nav_read", limit=100)          # navigator 读取
+[camoufox-reverse] get_runtime_probe_log(type_filter="addEventListener", limit=100)  # 鼠标/键盘检测
+
+返回 by_type 字段自动聚合各事件类型的总数，便于快速画出"这个页面都在观察什么"。
+```
+
+### 使用 pre_inject_hooks 解决首屏挑战页（v2.5.0 新增）
+
+```
+# 瑞数 412 / Akamai 首包检测场景：
+# 普通 navigate → launch_browser → navigate → 装 hook
+# 但此时 challenge JS 已经跑完了，hook 完全漏掉第一次 VMP 执行
+
+# 正确做法：走 about:blank 先装 hook 再 goto
+[camoufox-reverse] navigate(
+    url="https://target.com/",
+    wait_until="networkidle",
+    pre_inject_hooks=["xhr", "fetch", "cookie", "jsvmp_probe"],   # 先装这些
+    via_blank=True,                                                # 强制经 about:blank
+    collect_response_chain=True                                    # 记录重定向链
+)
+
+# 返回：
+#   initial_status: 首次响应状态（可能是 412）
+#   final_status:   最终状态（challenge 过后的 200）
+#   redirect_chain: [{url, status, ts}, ...] 整条重定向链
+#   hooks_injected: 实际装上的 hook 名列表
+#   warnings:       装 hook 失败等非致命问题
+```
+
+## camoufox-reverse MCP 工具分类总览（65 个，v0.4.0+）
 
 | 类别 | 工具 | 说明 |
 |------|------|------|
@@ -331,3 +575,6 @@
 | 网络 | `start_network_capture` `stop_network_capture` `list_network_requests` `get_network_request` `get_request_initiator` `intercept_request` `stop_intercept` | 网络分析（支持响应体捕获） |
 | 存储 | `get_cookies` `set_cookies` `delete_cookies` `get_storage` `set_storage` `export_state` `import_state` | 状态管理 |
 | 反检测 | `get_fingerprint_info` `check_detection` `bypass_debugger_trap` | 指纹与反检测 |
+| 源码级插桩 | `instrument_jsvmp_source` `get_instrumentation_log` `get_instrumentation_status` `stop_instrumentation` `find_dispatch_loops` | **[v0.4.0]** 通用 JSVMP 逆向利器 |
+| Cookie 归因 | `analyze_cookie_sources` | **[v0.4.0]** HTTP Set-Cookie + JS 写入融合分析 |
+| 导航增强 | `navigate(pre_inject_hooks)` `reload_with_hooks` `get_runtime_probe_log` | **[v0.4.0]** 首屏挑战/hook 重注入/运行时探针 |

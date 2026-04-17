@@ -19,7 +19,9 @@
     │   ├─ 混淆 JS（OB/CFF/eval）→ 反混淆后 → 模式A 或 模式B
     │   ├─ 服务端返回 JS 动态执行 → 模式B：VM 沙箱执行
     │   ├─ WASM 二进制 → 模式C：WASM 加载
-    │   ├─ JSVMP 虚拟机保护 → 先尝试 I/O 定位，失败则 → 模式D
+    │   ├─ JSVMP 虚拟机保护 → 先走四板斧（Hook/插桩/日志/源码级插桩） → 失败则 → 模式D/E
+    │   │    · 瑞数 5/6、Akamai、webmssdk、obfuscator.io → 第四板斧源码级插桩最有效
+    │   │    · 深度绑定环境指纹 → 模式E（jsdom 环境伪装）
     │   └─ 无法脱离浏览器环境 → 模式D：浏览器自动化
     │
     ├─ 纯请求方案是否可行？
@@ -122,7 +124,59 @@
    ↓
 8. 还原算法并对比中间值
    ↓
-9. 编写 Node.js 脚本
+9. 编写 Node.js / Python 脚本
    ↓
 10. 运行验证
 ```
+
+---
+
+## JSVMP 分支专属流程（v2.5.0 新增）
+
+识别到 JSVMP（200KB+ 单文件 + while-switch 分发循环 + 字节码数组）时，不要走通用流程的第 4-7 步，改走下面这个分支：
+
+```
+1. launch_browser(headless=False) + start_network_capture(capture_body=True)
+   ↓
+2. 导航前判断是否首屏挑战
+   ├─ 是（瑞数 412 / Akamai 403 等）
+   │   → navigate(url=..., pre_inject_hooks=["xhr","fetch","cookie","jsvmp_probe"], via_blank=True)
+   └─ 否
+       → navigate(url=...) + 之后装 hook + reload_with_hooks()
+   ↓
+3. find_dispatch_loops(script_url=<VMP_URL>) 确认 VMP（case_count > 50）
+   ↓
+4. 同时装三路探针：
+   ├─ 第一板斧（I/O 边界）：inject_hook_preset(cookie / xhr / fetch / crypto, persistent=True)
+   ├─ 第二板斧（解释器）：hook_jsvmp_interpreter(script_url=<VMP basename>)
+   └─ 第四板斧（源码级插桩，核心）：instrument_jsvmp_source(
+                                     url_pattern="**/<VMP 文件>",
+                                     mode="ast", tag="vmp1")
+   ↓
+5. reload_with_hooks() 让探针先于 VMP 生效 + 清日志
+   ↓
+6. 触发业务操作，让 VMP 生成一次签名
+   ↓
+7. 第三板斧读日志，分 3 个维度看：
+   ├─ get_instrumentation_log(tag_filter="vmp1") → hot_keys / hot_methods / hot_functions
+   ├─ get_jsvmp_log() → API 调用 + 属性读取摘要
+   ├─ analyze_cookie_sources() → cookie 归因（HTTP vs JS）
+   └─ get_console_logs() → xhr/fetch/cookie 预设的输出
+   ↓
+8. 根据 hot_methods 选还原策略：
+   ├─ 包含标准加密 API（CryptoJS.MD5 / Subtle.digest 等） → 模式 A 纯算法还原
+   ├─ 全自定义 + hot_keys 少 → 模式 B 提取函数 + vm/execjs 沙箱
+   ├─ 全自定义 + hot_keys 多 + cookie 走 HTTP → 模式 E jsdom 环境伪装
+   └─ 以上都不行 → 模式 D 浏览器自动化（最后手段）
+   ↓
+9. 实现还原代码
+   ↓
+10. 连续 5+ 次请求验证稳定性
+   ↓
+11. stop_instrumentation() + remove_hooks() 清理
+```
+
+参考文档：
+- `references/jsvmp-analysis.md`：四板斧方法论总纲
+- `references/jsvmp-source-instrumentation.md`：第四板斧源码级插桩专项（v2.5.0 新）
+- `references/jsdom-env-patches.md`：模式 E 环境伪装补丁库

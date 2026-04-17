@@ -1,13 +1,14 @@
-# Camoufox 逆向分析 Skill
+# JS 逆向分析 Skill
 
-面向逆向分析与爬虫对抗场景的 Skill，围绕 `camoufox-reverse` MCP 构建单一工作流：先用 Camoufox 反检测浏览器完成网络捕获、源码定位、Hook 调试与反检测验证，再按需落地到 Node.js 或 Python 算法还原与自动化调用。
+面向 Web 逆向分析与接口签名还原场景的 Skill，围绕 `camoufox-reverse` MCP 构建单一工作流：先用 Camoufox 反检测浏览器完成网络捕获、源码定位、Hook 调试与反检测验证，再按需落地到 Node.js 或 Python 算法还原与自动化调用。
 
 ## 核心能力
 
 - **双语言算法还原**: Node.js (`crypto` / `crypto-js`) 与 Python (`hashlib` / `pycryptodome`) 双路径实现
 - **加密算法还原**: MD5/SHA/AES/DES/RSA/HMAC/Base64 等常见加密算法的纯算法复现
 - **JS 混淆还原**: OB混淆、控制流平坦化、eval打包、自定义VM/JSVMP 等混淆类型的分析策略
-- **JSVMP 行为追踪**: Hook/插桩/日志分析三板斧，从行为层面追踪 JS 虚拟机保护的签名生成链路（详见专项指南）
+- **JSVMP 行为追踪**: Hook/插桩/日志/源码级插桩四板斧（v2.5.0 新增第四板斧），从行为层面追踪 JS 虚拟机保护的签名生成链路，对瑞数 5/6、Akamai sensor_data、webmssdk、obfuscator.io 通用有效（详见专项指南）
+- **Cookie 归因分析**: `analyze_cookie_sources` 融合 HTTP Set-Cookie 与 JS document.cookie 日志，一次性解答"这个 Cookie 到底是谁写的"（v2.5.0 新增）
 - **动态 Cookie 逆向**: eval首包、api预热、浏览器指纹等 Cookie 生成机制的破解
 - **WASM 逆向**: WebAssembly 加密模块的加载、环境补全和调用
 - **协议层对抗**: TLS 指纹检测、HTTP/2 强制、频率限制等协议层防护的应对
@@ -50,7 +51,7 @@ git clone https://github.com/WhiteNightShadow/hello_js_reverse_skill.git ~/.code
 git clone https://github.com/WhiteNightShadow/hello_js_reverse_skill.git ~/.vscode/skills/hello_js_reverse_skill
 ```
 
-> 安装完成后，AI Agent 会自动读取 `SKILL.md` 获取 Camoufox 逆向分析能力。当你在对话中涉及接口签名分析、反爬对抗、动态 Cookie、混淆 JS、WASM 或浏览器环境调试等场景时，Skill 会自动激活。
+> 安装完成后，AI Agent 会自动读取 `SKILL.md` 获取 JS 逆向分析能力。当你在对话中涉及接口签名分析、反爬对抗、动态 Cookie、混淆 JS、WASM 或浏览器环境调试等场景时，Skill 会自动激活。
 
 ## 项目结构
 
@@ -170,7 +171,7 @@ python main.py
 
 ## MCP 工具集成
 
-本 Skill 只围绕 [`camoufox-reverse` MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) 服务器组织能力（Camoufox 反检测浏览器，52 个工具）：
+本 Skill 只围绕 [`camoufox-reverse` MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) 服务器组织能力（Camoufox 反检测浏览器，**65 个工具，v0.4.0+**）：
 
 | 核心工具 | 用途 |
 |---------|------|
@@ -192,6 +193,14 @@ python main.py
 | `check_detection` / `get_fingerprint_info` | 反检测验证与指纹查看 |
 | `bypass_debugger_trap` | 一键绕过反调试陷阱 |
 | `export_state` / `import_state` | 保存/恢复浏览器状态 |
+| `find_dispatch_loops` | **[v2.5.0 新]** 扫描脚本定位字节码分发函数（while+switch，case 数过滤） |
+| `instrument_jsvmp_source` | **[v2.5.0 新]** 源码级插桩：在 HTTP 层改写 VMP，对每个 obj[key]/fn(args) 插入 tap（通用 VMP 利器） |
+| `get_instrumentation_log` / `get_instrumentation_status` / `stop_instrumentation` | **[v2.5.0 新]** 源码插桩日志（hot_keys/hot_methods/hot_functions）/ 状态 / 停止 |
+| `reload_with_hooks` | **[v2.5.0 新]** 重载让 persistent hook 先于页面 JS 执行（+ 清日志） |
+| `analyze_cookie_sources` | **[v2.5.0 新]** Cookie 归因：HTTP Set-Cookie vs JS document.cookie 融合分析 |
+| `get_runtime_probe_log` | **[v2.5.0 新]** 获取 runtime_probe 预设的广谱事件日志（xhr/fetch/canvas/WebGL/nav） |
+| `navigate(pre_inject_hooks=[...], via_blank=True)` | **[v2.5.0 增强]** 首屏挑战页预注入 hook + 返回 initial_status/final_status/redirect_chain |
+| `inject_hook_preset("cookie" | "runtime_probe")` | **[v2.5.0 增强]** 新增两个预设 |
 
 详见 `references/mcp-cookbook.md`。
 
@@ -214,6 +223,8 @@ python main.py
 | 环境检测 | webdriver/蜜罐/指纹 | `environment-patch.md` |
 | 反检测站点 | Cloudflare/瑞数/极验绕过 | SKILL.md |
 | **请求失败排查** | **Cookie/Header/时间戳/签名对比** | **`troubleshooting.md`** |
+| **通用 JSVMP 源码级插桩** | **HTTP 层源码改写 + hot_keys 指纹学习法（v2.5.0 新增）** | **`jsvmp-source-instrumentation.md`** |
+| **Cookie 归因分析** | **HTTP Set-Cookie vs JS document.cookie 融合分析** | **`mcp-cookbook.md` 场景 7** |
 
 ## 技术栈
 
@@ -237,4 +248,4 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp)**: 反检测浏览器逆向分析（52 个工具，含 JSVMP 专项分析）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v0.4.0+**: 反检测浏览器逆向分析（65 个工具，含 JSVMP 源码级插桩 + Cookie 归因分析）
