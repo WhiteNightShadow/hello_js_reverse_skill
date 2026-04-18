@@ -213,7 +213,7 @@
   [camoufox-reverse] evaluate_js(expression="ws.send(JSON.stringify({...}))")
 ```
 
-### 场景 6：通用 JSVMP 源码级插桩（瑞数/Akamai/webmssdk）[v2.5.0 新增]
+### 场景 6：通用 JSVMP 源码级插桩（RS/Akamai/webmssdk）[v2.5.0 新增]
 
 **目标**：定位 VMP 读取的环境指纹集与调用的加密原语，不依赖 VMP 具体实现
 
@@ -344,7 +344,7 @@
 
 **关键洞察**：
 
-> 对于瑞数、Akamai 这类"JS 算 token、服务端 Set-Cookie"的混合模式，单纯 `hook_function(Document.prototype.cookie)` 是抓不到最终 cookie 写入的——因为它是 HTTP header 写的，不经过 JS。`analyze_cookie_sources` 的价值就是 30 秒内消除这个盲区。
+> 对于RS、Akamai 这类"JS 算 token、服务端 Set-Cookie"的混合模式，单纯 `hook_function(Document.prototype.cookie)` 是抓不到最终 cookie 写入的——因为它是 HTTP header 写的，不经过 JS。`analyze_cookie_sources` 的价值就是 30 秒内消除这个盲区。
 
 ## 高级技巧
 
@@ -587,7 +587,7 @@ await instrument_jsvmp_source("**/vmp.js", mode="ast_page")
 ### 使用 pre_inject_hooks 解决首屏挑战页（v2.5.0 新增）
 
 ```
-# 瑞数 412 / Akamai 首包检测场景：
+# RS 412 / Akamai 首包检测场景：
 # 普通 navigate → launch_browser → navigate → 装 hook
 # 但此时 challenge JS 已经跑完了，hook 完全漏掉第一次 VMP 执行
 

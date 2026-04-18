@@ -7,13 +7,13 @@
 - **双语言算法还原**: Node.js (`crypto` / `crypto-js`) 与 Python (`hashlib` / `pycryptodome`) 双路径实现
 - **加密算法还原**: MD5/SHA/AES/DES/RSA/HMAC/Base64 等常见加密算法的纯算法复现
 - **JS 混淆还原**: OB混淆、控制流平坦化、eval打包、自定义VM/JSVMP 等混淆类型的分析策略
-- **JSVMP 行为追踪**: Hook/插桩/日志/源码级插桩四板斧（v2.5.0 新增第四板斧），从行为层面追踪 JS 虚拟机保护的签名生成链路，对瑞数 5/6、Akamai sensor_data、webmssdk、obfuscator.io 通用有效（详见专项指南）
+- **JSVMP 行为追踪**: Hook/插桩/日志/源码级插桩四板斧（v2.5.0 新增第四板斧），从行为层面追踪 JS 虚拟机保护的签名生成链路，对RS 5/6、Akamai sensor_data、webmssdk、obfuscator.io 通用有效（详见专项指南）
 - **Cookie 归因分析**: `analyze_cookie_sources` 融合 HTTP Set-Cookie 与 JS document.cookie 日志，一次性解答"这个 Cookie 到底是谁写的"（v2.5.0 新增）
-- **反爬类型分档决策（v2.6.0）**：签名型（瑞数/Akamai）/ 行为型（TikTok/极验）/ 纯混淆 三类反爬的工具路径完全不同，内置顶层决策框架，避免"observer effect 破坏签名"的经典陷阱
+- **反爬类型分档决策（v2.6.0）**：签名型（RS/Akamai）/ 行为型（TK/JY）/ 纯混淆 三类反爬的工具路径完全不同，内置顶层决策框架，避免"observer effect 破坏签名"的经典陷阱
 - **动态 Cookie 逆向**: eval首包、api预热、浏览器指纹等 Cookie 生成机制的破解
 - **WASM 逆向**: WebAssembly 加密模块的加载、环境补全和调用
 - **协议层对抗**: TLS 指纹检测、HTTP/2 强制、频率限制等协议层防护的应对
-- **反检测浏览器**: Camoufox C++ 引擎级指纹伪装，绕过 Cloudflare/瑞数/极验等反爬检测
+- **反检测浏览器**: Camoufox C++ 引擎级指纹伪装，绕过 Cloudflare/RS/JY等反爬检测
 - **单 MCP 工作流**: 统一使用 `camoufox-reverse` 完成源码搜索、Hook 注入、函数追踪、网络分析、请求拦截与反检测验证
 - **错误排查体系**: 完整的请求失败排查流程和签名值不一致排查方法论
 - **Codex/Claude Code 完整适配**: 内置 Agent 授权指令框架，确保 AI 全力协助完成分析任务
@@ -226,7 +226,7 @@ python main.py
 | WebSocket | WS消息分析/协议解析 | `mcp-cookbook.md` |
 | 反调试 | debugger绕过/检测对抗 | `anti-debug.md` |
 | 环境检测 | webdriver/蜜罐/指纹 | `environment-patch.md` |
-| 反检测站点 | Cloudflare/瑞数/极验绕过 | SKILL.md |
+| 反检测站点 | Cloudflare/RS/JY绕过 | SKILL.md |
 | **请求失败排查** | **Cookie/Header/时间戳/签名对比** | **`troubleshooting.md`** |
 | **通用 JSVMP 源码级插桩** | **HTTP 层源码改写 + hot_keys 指纹学习法（v2.5.0 新增）** | **`jsvmp-source-instrumentation.md`** |
 | **Cookie 归因分析** | **HTTP Set-Cookie vs JS document.cookie 融合分析** | **`mcp-cookbook.md` 场景 7** |

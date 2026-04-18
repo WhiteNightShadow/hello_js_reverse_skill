@@ -20,7 +20,7 @@
     │   ├─ 服务端返回 JS 动态执行 → 模式B：VM 沙箱执行
     │   ├─ WASM 二进制 → 模式C：WASM 加载
     │   ├─ JSVMP 虚拟机保护 → 先走四板斧（Hook/插桩/日志/源码级插桩） → 失败则 → 模式D/E
-    │   │    · 瑞数 5/6、Akamai、webmssdk、obfuscator.io → 第四板斧源码级插桩最有效
+    │   │    · RS 5/6、Akamai、webmssdk、obfuscator.io → 第四板斧源码级插桩最有效
     │   │    · 深度绑定环境指纹 → 模式E（jsdom 环境伪装）
     │   └─ 无法脱离浏览器环境 → 模式D：浏览器自动化
     │
@@ -139,7 +139,7 @@
 1. launch_browser(headless=False) + start_network_capture(capture_body=True)
    ↓
 2. 导航前判断是否首屏挑战
-   ├─ 是（瑞数 412 / Akamai 403 等）
+   ├─ 是（RS 412 / Akamai 403 等）
    │   → navigate(url=..., pre_inject_hooks=["xhr","fetch","cookie","jsvmp_probe"], via_blank=True)
    └─ 否
        → navigate(url=...) + 之后装 hook + reload_with_hooks()

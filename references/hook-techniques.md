@@ -396,7 +396,7 @@ Hook 是 JS 逆向中最核心的技术之一。通过劫持/拦截 JS 原生函
 5. **使用 `console.trace`**：在关键点输出调用栈
 6. **Camoufox 优势**：Juggler 协议沙箱隔离，Hook 不会被页面 JS 检测到
 7. **使用 Proxy 代替直接覆写**：更隐蔽，不改变 `typeof` 结果
-8. **首屏挑战页用 `navigate(pre_inject_hooks=[...])`** [v2.5.0]：瑞数/Akamai 首包挑战在 hook 装好前就跑完了，用这个参数让 hook 先装再 goto
+8. **首屏挑战页用 `navigate(pre_inject_hooks=[...])`** [v2.5.0]：RS/Akamai 首包挑战在 hook 装好前就跑完了，用这个参数让 hook 先装再 goto
 9. **装完 hook 想让它先于页面 JS 跑**：用 `reload_with_hooks()` [v2.5.0] 替代裸 `reload()`，同时会清掉各类 `__mcp_*_log`
 
 ---

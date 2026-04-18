@@ -228,6 +228,6 @@
 | 实时对比 | `evaluate_js` | 在浏览器中执行还原后的签名函数，与脚本输出对比 |
 | **Cookie 归因** [v2.5.0] | `analyze_cookie_sources` | 辨识 Cookie 是 HTTP Set-Cookie 还是 JS document.cookie 写的 |
 | **源码级插桩** [v2.5.0] | `instrument_jsvmp_source` + `get_instrumentation_log` | 对 VMP 做 HTTP 层源码改写，hot_keys 暴露环境指纹集 |
-| **首屏挑战** [v2.5.0] | `navigate(pre_inject_hooks=[...])` | 瑞数/Akamai 412 挑战页 hook 预注入 |
+| **首屏挑战** [v2.5.0] | `navigate(pre_inject_hooks=[...])` | RS/Akamai 412 挑战页 hook 预注入 |
 | **hook 重载** [v2.5.0] | `reload_with_hooks` | 重载使 persistent hook 先于页面 JS 执行 + 清日志 |
 | **运行时探针** [v2.5.0] | `get_runtime_probe_log` | 快速摸底页面在读什么 / 调什么（低开销） |

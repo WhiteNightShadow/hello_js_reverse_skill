@@ -1,4 +1,4 @@
-# JSVMP-瑞数6+Cookie生成+412挑战+sdenv补环境
+# JSVMP-RS6+Cookie生成+412挑战+sdenv补环境
 
 > 难度：★★★★★
 > 还原方案：E: jsdom 环境模拟（sdenv 魔改 jsdom + C++ V8 Addon）
@@ -22,7 +22,7 @@
 - [x] 首次请求返回 HTTP 412（非标准状态码），响应体为精简 HTML（含 meta + 内联 $_ts 配置 + 外部 JS 引用 + 入口函数调用）
 - [x] 412 响应的 Set-Cookie 头同时下发 `acw_tc`（会话标识）和 `XxxS`（服务端标识，HttpOnly，过期时间 10 年）
 - [x] 成功请求需携带 3 个 Cookie：`acw_tc` + `XxxS`（服务端下发）+ `XxxT`（客户端生成）
-- [x] 瑞数 JS 文件 URL 路径包含随机目录名和文件名，但版本号后缀（如 `.e17ed02.js`）在一段时间内固定
+- [x] RS JS 文件 URL 路径包含随机目录名和文件名，但版本号后缀（如 `.e17ed02.js`）在一段时间内固定
 
 ### 反调试特征
 - [x] JSVMP 内部使用函数表+直接调用（非 `Function.prototype.apply/call`），导致标准 JSVMP Hook 工具无法拦截
@@ -41,7 +41,7 @@
   - list_scripts → 存在 230KB+ 文件 → 辅助确认
   - list_network_requests → 首次请求返回 412 → 高置信度
   - 检查 Set-Cookie 头 → 存在 acw_tc + XxxS 格式 Cookie → 直接定位本案例
-  匹配判定：412 响应 + $_ts 配置 + _$ 前缀变量 → 瑞数6 高置信度匹配
+  匹配判定：412 响应 + $_ts 配置 + _$ 前缀变量 → RS6 高置信度匹配
 ```
 
 ---
@@ -83,44 +83,44 @@
 
 步骤 4: Cookie setter Hook 验证
   注入 document.cookie setter Hook，发现 Cookie 日志为空 —
-  说明瑞数 JS 不是通过标准 document.cookie setter 写入的
+  说明RS JS 不是通过标准 document.cookie setter 写入的
   （可能是通过 jsdom 内部机制或 location.replace 触发的重新请求时由浏览器自动携带）。
 
 步骤 5: JSVMP 插桩尝试
-  使用 hook_jsvmp_interpreter 对瑞数 JS 进行插桩，发现日志为空 —
-  确认瑞数6使用内部函数表+直接调用，不经过 Function.prototype.apply/call，
+  使用 hook_jsvmp_interpreter 对RS JS 进行插桩，发现日志为空 —
+  确认RS6使用内部函数表+直接调用，不经过 Function.prototype.apply/call，
   标准 JSVMP Hook 无效。
 
 步骤 6: 环境对比
   使用 compare_env 采集 Camoufox 中的真实浏览器环境数据，
   发现 document.cookie 中包含 enable_XxxYyy=true 标记，
-  说明瑞数 JS 执行成功后会设置一个启用标记。
+  说明RS JS 执行成功后会设置一个启用标记。
 
-步骤 7: 瑞数 JS 保存
-  通过 save_script 将 230KB 的瑞数 JS 文件保存到本地，分析其结构：
+步骤 7: RS JS 保存
+  通过 save_script 将 230KB 的RS JS 文件保存到本地，分析其结构：
   以 if($_ts.cd){ 开头，内部是 JSVMP 解释器，
   window 仅出现 3 次（环境访问全部通过 JSVMP 字节码间接进行）。
 
 步骤 8: 补环境方案选型
   参考开源社区的手动补环境方案和 sdenv/纯算/JsRpc 多方案，
-  确定 sdenv（魔改 jsdom + C++ V8 Addon）是瑞数6的最优纯 Node.js 方案。
+  确定 sdenv（魔改 jsdom + C++ V8 Addon）是RS6的最优纯 Node.js 方案。
 ```
 
 ---
 
 ## 还原代码模板
 
-### 核心函数：瑞数6 Cookie 生成 — 基于 sdenv
+### 核心函数：RS6 Cookie 生成 — 基于 sdenv
 
 ```javascript
 /**
- * 瑞数6 Cookie 生成 — 基于 sdenv (魔改 jsdom + C++ V8 Addon)
+ * RS6 Cookie 生成 — 基于 sdenv (魔改 jsdom + C++ V8 Addon)
  * 依赖: npm install sdenv (需要 pnpm 安装 + node-gyp 编译原生模块)
  * 原理:
  *   sdenv 的核心是 documentAll.node (51行C++)，用 V8 的
  *   ObjectTemplate::MarkAsUndetectable() 实现 document.all 的浏览器特有行为
  *   (typeof === "undefined" 但可调用)，加上完整的浏览器环境模拟，
- *   让瑞数 JSVMP 在 Node.js 中真实执行并生成有效 Cookie。
+ *   让RS JSVMP 在 Node.js 中真实执行并生成有效 Cookie。
  */
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -145,7 +145,7 @@ class RuishuClient {
       consoleConfig: { error: () => {} },
     });
 
-    // 等待瑞数 JS 执行完毕
+    // 等待RS JS 执行完毕
     await new Promise(resolve => {
       this.dom.window.addEventListener('sdenv:exit', () => resolve());
       setTimeout(resolve, 8000);
@@ -195,14 +195,14 @@ class RuishuClient {
 
 | # | 坑 | 现象 | 解决方法 |
 |---|---|------|---------|
-| 1 | 误判反爬类型 | 通过 webFetch 直接请求返回 412，猜测是 JSL 加速乐（`__jsl_clearance_s` cookie），实际是瑞数信息（RS） | 不要猜，用 Camoufox 实际抓包看 412 响应体结构和 Set-Cookie 头 |
-| 2 | Cookie 有效但请求返回 400 | Camoufox 获取的 Cookie 有效（curl 测试返回 200），但 axios 请求返回 400 | 瑞数不仅检查 Cookie，还检查请求头指纹 — UA 必须与生成 Cookie 时一致，且必须包含 `Sec-Fetch-Site: same-origin` 等 Fetch Metadata 头 |
-| 3 | jsdom 执行瑞数 JS 卡死（超时） | 原生 jsdom + `runScripts: 'dangerously'` 加载 412 页面，瑞数 JS 执行后进入死循环 | `typeof document.all` 在 jsdom 中返回 `"object"` 而非 `"undefined"`，瑞数检测到非浏览器环境后故意卡死。必须用 sdenv（C++ 层面实现 `MarkAsUndetectable()`）或真实浏览器 |
-| 4 | V8 `%GetUndetectable()` 不够 | 用 V8 内部函数获取的 undetectable 对象通过了 `typeof === "undefined"` 检测，但它是空对象，没有 `HTMLAllCollection` 的方法 | 瑞数 JSVMP 后续尝试调用该对象的方法时报错 `_$xx[_$yy[49]] is not a function`。`document.all` 不仅要通过 typeof 检测，还要有完整的集合行为 |
-| 5 | 瑞数入口函数名每次不同 | 412 响应体底部的入口函数调用（如 `_$bV()`, `_$l1()`, `_$jH()`）每次请求都不同 | 正则匹配时需要用 `_\$[a-zA-Z0-9]+\(\)` 而非固定函数名 |
+| 1 | 误判反爬类型 | 通过 webFetch 直接请求返回 412，猜测是 JSL 加速乐（`__jsl_clearance_s` cookie），实际是RS信息（RS） | 不要猜，用 Camoufox 实际抓包看 412 响应体结构和 Set-Cookie 头 |
+| 2 | Cookie 有效但请求返回 400 | Camoufox 获取的 Cookie 有效（curl 测试返回 200），但 axios 请求返回 400 | RS不仅检查 Cookie，还检查请求头指纹 — UA 必须与生成 Cookie 时一致，且必须包含 `Sec-Fetch-Site: same-origin` 等 Fetch Metadata 头 |
+| 3 | jsdom 执行RS JS 卡死（超时） | 原生 jsdom + `runScripts: 'dangerously'` 加载 412 页面，RS JS 执行后进入死循环 | `typeof document.all` 在 jsdom 中返回 `"object"` 而非 `"undefined"`，RS检测到非浏览器环境后故意卡死。必须用 sdenv（C++ 层面实现 `MarkAsUndetectable()`）或真实浏览器 |
+| 4 | V8 `%GetUndetectable()` 不够 | 用 V8 内部函数获取的 undetectable 对象通过了 `typeof === "undefined"` 检测，但它是空对象，没有 `HTMLAllCollection` 的方法 | RS JSVMP 后续尝试调用该对象的方法时报错 `_$xx[_$yy[49]] is not a function`。`document.all` 不仅要通过 typeof 检测，还要有完整的集合行为 |
+| 5 | RS入口函数名每次不同 | 412 响应体底部的入口函数调用（如 `_$bV()`, `_$l1()`, `_$jH()`）每次请求都不同 | 正则匹配时需要用 `_\$[a-zA-Z0-9]+\(\)` 而非固定函数名 |
 | 6 | Node.js v24 的 Navigator 原型有只读属性 | `Navigator.prototype` 上的 `language` 等属性已经有了 getter，用 `Object.assign` 赋值报错 | 必须用 `Object.defineProperty` 逐个覆盖 |
 | 7 | sdenv 原生模块编译 | sdenv 的核心 `documentAll.node` 是 C++ 原生模块，需要 node-gyp 编译 | pnpm 安装时默认不执行 build scripts，需要手动 `pnpm approve-builds` 或 `npx node-gyp rebuild` |
-| 8 | JSVMP Hook 工具对瑞数6无效 | Camoufox 的 `hook_jsvmp_interpreter` 通过 Hook `Function.prototype.apply/call` 追踪，但瑞数6使用内部函数表+直接调用，日志为空 | 不是所有 JSVMP 都能用标准 Hook 工具分析，需要根据具体实现选择分析方法 |
+| 8 | JSVMP Hook 工具对RS6无效 | Camoufox 的 `hook_jsvmp_interpreter` 通过 Hook `Function.prototype.apply/call` 追踪，但RS6使用内部函数表+直接调用，日志为空 | 不是所有 JSVMP 都能用标准 Hook 工具分析，需要根据具体实现选择分析方法 |
 
 ---
 
@@ -210,9 +210,9 @@ class RuishuClient {
 
 | 变体 | 差异点 | 影响 |
 |------|--------|------|
-| 瑞数 4/5 代 vs 6 代 | 瑞数6 JS 文件约 230KB，比 4/5 代（约 200KB）更大，环境检测项更多 | 4/5 代可通过手动补环境成功，6 代手动补环境极其困难，建议直接用 sdenv |
-| Cookie-only vs Cookie+URL后缀 | 大部分瑞数站点只需要 Cookie 即可访问。少数站点还需要 URL 后缀签名 | sdenv 只能生成 Cookie，不能生成 URL 后缀。需要后缀的站点建议用 JsRpc 方案 |
-| HTTP vs HTTPS | 部分瑞数站点使用 HTTP，其他使用 HTTPS | sdenv 的 `jsdomFromUrl` 两种协议都支持，但 HTTPS 站点需要设置 `NODE_TLS_REJECT_UNAUTHORIZED=0`（某些政府站点的证书链不完整） |
+| RS 4/5 代 vs 6 代 | RS6 JS 文件约 230KB，比 4/5 代（约 200KB）更大，环境检测项更多 | 4/5 代可通过手动补环境成功，6 代手动补环境极其困难，建议直接用 sdenv |
+| Cookie-only vs Cookie+URL后缀 | 大部分RS站点只需要 Cookie 即可访问。少数站点还需要 URL 后缀签名 | sdenv 只能生成 Cookie，不能生成 URL 后缀。需要后缀的站点建议用 JsRpc 方案 |
+| HTTP vs HTTPS | 部分RS站点使用 HTTP，其他使用 HTTPS | sdenv 的 `jsdomFromUrl` 两种协议都支持，但 HTTPS 站点需要设置 `NODE_TLS_REJECT_UNAUTHORIZED=0`（某些政府站点的证书链不完整） |
 | 静态页面 vs API 接口 | 列表页和详情页可能是纯静态 HTML（服务端渲染），用 cheerio 解析即可。其他站点可能有 JSON API 接口 | API 请求可能需要额外的签名参数（如 `sign = MD5(itemId + searchValue + timestamp)`） |
-| `$_ts` 配置差异 | 不同站点的 `$_ts` 配置结构可能不同，有的只有 `nsd` 和 `cd`，其他可能还有 `cp`、`aebi` 等字段 | sdenv 方案不需要关心这些差异，因为它让瑞数 JS 自己解析配置 |
-| 服务端动态更新 | 瑞数服务端可以随时更新 `basearr` 中的环境检测值 | 纯算方案会因此失效，sdenv 方案通常不受影响（除非瑞数新增了 sdenv 未模拟的检测点） |
+| `$_ts` 配置差异 | 不同站点的 `$_ts` 配置结构可能不同，有的只有 `nsd` 和 `cd`，其他可能还有 `cp`、`aebi` 等字段 | sdenv 方案不需要关心这些差异，因为它让RS JS 自己解析配置 |
+| 服务端动态更新 | RS服务端可以随时更新 `basearr` 中的环境检测值 | 纯算方案会因此失效，sdenv 方案通常不受影响（除非RS新增了 sdenv 未模拟的检测点） |

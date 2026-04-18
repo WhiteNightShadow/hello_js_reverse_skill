@@ -10,7 +10,7 @@
 
 ### 1.1 传统 hook 的盲区
 
-**`hook_jsvmp_interpreter`** 即使升级到 v0.4.0 的多路径版本（apply/call/bind + Reflect.*/Proxy 全局对象 + timing/random），仍然只能看到 VMP 路由到**可 hook JS API** 的部分。但瑞数 5/6、Akamai sensor_data v2/v3、webmssdk（短视频平台）、obfuscator.io 这类 VMP 的典型结构是：
+**`hook_jsvmp_interpreter`** 即使升级到 v0.4.0 的多路径版本（apply/call/bind + Reflect.*/Proxy 全局对象 + timing/random），仍然只能看到 VMP 路由到**可 hook JS API** 的部分。但RS 5/6、Akamai sensor_data v2/v3、webmssdk（短视频平台）、obfuscator.io 这类 VMP 的典型结构是：
 
 ```js
 // 典型的自包含 VMP 字节码分发循环
@@ -92,7 +92,7 @@ __mcp_tap_call(fn, null, [args[0], args[1], ...], 'vmp1');
 
 > **v0.5.0 变化**：`mode="ast"` 的实现从 v0.4.x 的"页面内加载 acorn CDN"改为
 > **MCP 侧 esprima-python 解析**。这意味着：
-> - 挑战页（瑞数 412、Akamai sensor_data 挑战等）上 AST 模式**能用了**（旧实现因 CDN 被挑战拦住会静默失败）
+> - 挑战页（RS 412、Akamai sensor_data 挑战等）上 AST 模式**能用了**（旧实现因 CDN 被挑战拦住会静默失败）
 > - 零 JS 依赖，`instrument_jsvmp_source` 的 AST 模式现在**应成为默认选择**
 > - 新增 `fallback_on_error=True`，esprima 解析失败时自动回落 regex
 > - 旧的 "ast_page" 模式保留但标注为 deprecated，仅做 A/B 对比用
@@ -126,13 +126,13 @@ __mcp_tap_call(fn, null, [args[0], args[1], ...], 'vmp1');
 2. 如果是 ES2022+ 的 private field / static block / top-level await 等新语法 → 手动 `mode="regex"`（~80% 覆盖）或 `mode="transparent"`（runtime 观察）兜底
 3. 如果是 `SyntaxError: Unexpected token` 开头 → 可能 JS 被加了 BOM 或非标准前缀，可以本地用 `curl` 下来手动检查首 100 字节
 
-一般来说，瑞数 sdenv*.js / Akamai acmescripts*.js / webmssdk 都能被 esprima 解析。如果出现持续 fallback，报告给 MCP 仓库 issue 区。
+一般来说，RS sdenv*.js / Akamai acmescripts*.js / webmssdk 都能被 esprima 解析。如果出现持续 fallback，报告给 MCP 仓库 issue 区。
 
 ---
 
 ## 3. 黄金 8 步流程
 
-> 这是面向瑞数 5/6、Akamai sensor_data、webmssdk、obfuscator.io 的通用流程。照抄 `Actions` 段即可，执行方需要替换的只有 `url_pattern` 和 `script_url`。
+> 这是面向RS 5/6、Akamai sensor_data、webmssdk、obfuscator.io 的通用流程。照抄 `Actions` 段即可，执行方需要替换的只有 `url_pattern` 和 `script_url`。
 
 ### Step 1 — 启动 + 网络捕获
 
@@ -207,10 +207,10 @@ Actions:
   reload_with_hooks(clear_log=True, wait_until="networkidle")
   → 注意 final_status：
     · 200   → 正常
-    · 412   → 瑞数挑战页未过，需要等 challenge 完成
+    · 412   → RS挑战页未过，需要等 challenge 完成
     · 403   → Akamai 拦截，检查指纹或 UA
 
-特殊场景：若目标就是首屏挑战页（瑞数 412），用：
+特殊场景：若目标就是首屏挑战页（RS 412），用：
   navigate(
     url="https://target.com/",
     pre_inject_hooks=["xhr", "fetch", "cookie", "jsvmp_probe"],

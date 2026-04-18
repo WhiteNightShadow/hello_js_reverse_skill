@@ -1,6 +1,6 @@
 # 案例：通用 VMP 源码级插桩（骨架模板）
 
-> **v2.5.0 骨架案例**。本文是一个**方法论模板**，不是某个具体站点的案例。适用于：瑞数 5/6、Akamai sensor_data v2/v3、webmssdk、obfuscator.io 等所有"算法封装在字节码 dispatch 循环里"的 VMP。
+> **v2.5.0 骨架案例**。本文是一个**方法论模板**，不是某个具体站点的案例。适用于：RS 5/6、Akamai sensor_data v2/v3、webmssdk、obfuscator.io 等所有"算法封装在字节码 dispatch 循环里"的 VMP。
 >
 > 使用方式：
 >
@@ -20,7 +20,7 @@
   - 固定长度签名参数（128/192/256 字符） + Base64 变体（有 `-_` 替换 `+/`） 或 hex
   - 典型参数名：`a_bogus` / `_signature` / `X-Bogus` / `msToken` / `_m_h5_tk` / `acw_tc` / `FSSBBIl1UgzbN7N`
 - **请求特征**：
-  - 首包返回 412（瑞数）或 403（Akamai）+ 动态 cookie 写入后通过
+  - 首包返回 412（RS）或 403（Akamai）+ 动态 cookie 写入后通过
   - 存在预热接口（如 `/challenge` / `/akam/11/*` / `/v1/gen_token`）
   - Cookie 中有多个动态字段（JS 写的 + HTTP Set-Cookie 发的）
 - **反调试特征**：
@@ -83,7 +83,7 @@ Step 5 — 装兜底 hook（若 Step 2 没走 pre_inject_hooks）
   inject_hook_preset("crypto", persistent=True)
   hook_jsvmp_interpreter(script_url="[VMP basename]")
   # 注意：本案例针对的是"通用"场景（含签名型和行为型）。如果目标是签名型反爬
-  # （瑞数/Akamai），不要这样用 hook_jsvmp_interpreter，改为：
+  # （RS/Akamai），不要这样用 hook_jsvmp_interpreter，改为：
   #   - instrument_jsvmp_source(mode="ast")  （首选）
   #   - hook_jsvmp_interpreter(mode="transparent")  （备选）
   # 参考 SKILL.md "反爬类型识别与工具选择" 章节
@@ -196,8 +196,8 @@ function genSign(input) {
 
 | 变体 | 差异点 | 调整策略 |
 |------|-------|---------|
-| 瑞数 5 | 固定 `sdenv-*.js` 命名 | url_pattern 用 `**/sdenv-*.js` |
-| 瑞数 6 | 脚本名每次不同 + 多层 VMP | 先 `list_network_requests` 找所有 100KB+ JS，逐个 instrument（tag 区分） |
+| RS 5 | 固定 `sdenv-*.js` 命名 | url_pattern 用 `**/sdenv-*.js` |
+| RS 6 | 脚本名每次不同 + 多层 VMP | 先 `list_network_requests` 找所有 100KB+ JS，逐个 instrument（tag 区分） |
 | Akamai sensor_data | `_abck` / `bm_sz` cookie | 重点看 `hot_keys` 中 touch/mouse 事件相关属性 |
 | webmssdk（短视频平台） | 配合 msToken 预热 | 需先让 `/v1/generate_token` 预热接口完成再触发业务 |
 | obfuscator.io（开源） | case 数可能只有 20-30 | `find_dispatch_loops(min_case_count=15)` |
