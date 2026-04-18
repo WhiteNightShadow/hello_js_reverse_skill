@@ -4,13 +4,15 @@ description: >
   Node.js / Python 接口自动化与签名还原工程技能：对自有平台或已授权平台的 Web API 进行签名分析与接口对接，
   通过 Camoufox 反检测浏览器动态调试与静态源码分析，定位并还原前端加密/签名逻辑，
   使用 Node.js 或 Python 实现算法复现与自动化接口调用。
-  深度集成 camoufox-reverse MCP v0.6.0（C++ 引擎级指纹伪装，68 个逆向分析工具，签名型反爬兼容改造，新增 CSP 预检与双签名场景支持）。
+  深度集成 camoufox-reverse MCP v0.8.0（C++ 引擎级指纹伪装，78 个逆向分析工具，域级 Session 档案 + 断言系统）。
   擅长 JSVMP 虚拟机保护的双路径攻克：路径 A 算法追踪（Hook / 插桩 / 日志分析 / 源码级插桩四板斧，
   通用对RS 5/6、Akamai sensor_data、webmssdk、obfuscator.io）、
   路径 B 环境伪装（jsdom/vm 沙箱 + 浏览器环境采集对比 + 全量补丁）。
   v2.6.0 新增反爬类型三分法（签名型/行为型/纯混淆）作为顶层决策框架，明确
   pre_inject_hooks 与 hook_jsvmp_interpreter(mode="proxy") 对签名型反爬不可用，
   引入 mode="transparent" 签名安全备选与 MCP 侧 AST 源码插桩（消除 CDN 依赖）。
+  v2.9.0 新增域级 Session 档案（跨任务复用反爬判定/指纹基准/Cookie 归因）与断言驱动交付体系，
+  Phase 5 升级为断言驱动结构化交付，新增降级梯度原则防止 AI 过早放弃。
 argument-hint: "<目标URL> [需要分析的加密参数名, 如 sign, m, token]"
 ---
 
@@ -88,6 +90,26 @@ argument-hint: "<目标URL> [需要分析的加密参数名, 如 sign, m, token]
 1. 用 Hook 确认该环境值是否被发送到服务端（出现在请求参数/Header/Cookie 中）
 2. 用对比测试确认：改变该值是否导致请求失败
 3. 只补真正参与校验的最小环境项，避免过度补全
+
+### 5. 禁止未经梯度降级切换
+
+遇到工具失败（如 `instrument_jsvmp_source(mode="ast")` 返回空日志、`navigate` 反复 412、签名值始终不一致）时，**必须按降级梯度逐级尝试**，禁止直接跳到最终方案（如直接放弃协议还原改用浏览器自动化）。
+
+**降级梯度（从最优到最后手段）**：
+
+```
+instrument_jsvmp_source(mode="ast")
+  → instrument_jsvmp_source(mode="regex")          # AST 失败退 regex
+    → hook_jsvmp_interpreter(mode="transparent")    # 源码插桩全失败退 runtime 观察
+      → hook_jsvmp_interpreter(mode="proxy")        # 仅行为型可用
+        → 纯 pre_inject_hooks 观察                  # 仅行为型/纯混淆可用
+```
+
+**规则**：
+- 每级至少尝试一次并记录失败原因，才能降到下一级
+- 降级时在 Session 档案中记录降级路径和原因
+- 降到 `mode="proxy"` 或 `pre_inject_hooks` 时，必须先确认反爬类型不是签名型
+- 最终降级到浏览器自动化前，必须向用户说明原因并获得确认
 
 ---
 
@@ -194,7 +216,7 @@ const r2 = await navigate(url, { pre_inject_hooks: ["jsvmp_probe"] })
 
 ## 核心武器：camoufox-reverse MCP
 
-Camoufox 反检测浏览器 + Playwright 协议，C++ 引擎级指纹伪装，68 个工具覆盖逆向分析全链路（v0.6.0）。
+Camoufox 反检测浏览器 + Playwright 协议，C++ 引擎级指纹伪装，78 个工具覆盖逆向分析全链路（v0.8.0）。
 
 **核心优势：**
 - Camoufox 在 **C++ 引擎层** 修改指纹信息，而非 JS 补丁
@@ -204,6 +226,17 @@ Camoufox 反检测浏览器 + Playwright 协议，C++ 引擎级指纹伪装，68
 - Hook 持久化 + 防覆盖：跨导航自动重注入，`Object.defineProperty` 冻结防止页面 JS 覆盖
 - v0.5.0 签名型反爬兼容：hook_jsvmp_interpreter 新增 mode="transparent" 模式（仅 prototype getter 替换，不装 Proxy、不改 Function.prototype，对签名型反爬透明）；instrument_jsvmp_source 的 AST 模式改为 MCP 侧 esprima-python 实现，挑战页也能跑（不再依赖外部 CDN 加载 acorn）
 - v0.6.0 新增：`instrument_jsvmp_source` 支持 `csp_bypass=True` 自动绕过 Content-Security-Policy 限制（对严格 CSP 站点的 AST 模式不再静默失败）；`navigate` 新增 `collect_response_chain=True`（默认）精确记录 JS 驱动的重定向链；新增 3 个工具（`check_csp_policy` / `get_response_chain` / `get_dual_sign_data`）
+- v0.8.0 新增：域级 Session 档案管理工具（`create_session` / `load_session` / `update_session` / `run_assertions` / `get_session_summary`）；断言系统内置 8 种断言类型自动验证；`export_state` 支持关联 Session 档案；新增 `diff_hot_keys` 工具对比两次 hot_keys 快照差异
+
+### 域级 Session 档案（v2.9.0 / v0.8.0 新增）
+
+每个目标域维护一份持久化 Session 档案，跨任务复用反爬类型判定、指纹基准、Cookie 归因结论。
+
+- **存储位置**：`cases/_session_archives/<domain-hash>/`（域名 SHA256 前 12 位，已加入 `.gitignore`）
+- **核心文件**：`session.json`（元数据）/ `fingerprint.json`（指纹快照）/ `cookie-attribution.json`（归因缓存）/ `assertions.json`（断言集）
+- **生命周期**：7 天有效，过期后标记 `stale` 提示重新验证，不自动删除
+- **断言系统**：8 种断言类型（`script_exists` / `script_size_range` / `dispatch_loop_count` / `anti_crawl_type` / `cookie_names` / `sdk_fingerprint` / `hot_keys_stable` / `response_structure`），Phase 0.5.-1 自动 Reverify
+- 详见 `references/domain-session-guide.md`
 
 ### 浏览器与页面控制
 
@@ -407,11 +440,47 @@ Camoufox 反检测浏览器 + Playwright 协议，C++ 引擎级指纹伪装，68
    - 通过 `launch_browser` + `navigate` 启动反检测浏览器并打开目标 URL
    - 用户提供了 Cookie → `set_cookies` 写入并 `reload` 刷新
    - 用户没提供 Cookie → 直接进入分析，后续按需再引导获取
-4. 创建项目目录（以目标网站/功能命名），结构参考 `templates/` 下的模板
+4. **启动域级 Session 档案**（v2.9.0 新增）：
+   - 计算目标域的 hash：`sha256(domain)[0:12]`
+   - 检查 `cases/_session_archives/<hash>/session.json` 是否存在
+   - 存在且未过期（7 天内）→ 加载档案，输出摘要（反爬类型、上次分析时间、断言通过数）
+   - 存在但过期 → 加载档案 + 标记 `stale`，提示用户建议重新验证
+   - 不存在 → 创建空档案，后续步骤自动填充
+   - 详见 `references/domain-session-guide.md`
+5. 创建项目目录（以目标网站/功能命名），结构参考 `templates/` 下的模板
 
 ### Phase 0.5：经验库指纹匹配（30 秒快速检测）
 
 > **目的**：在进入正式逆向流程前，快速检测目标站点的技术特征，与 `cases/` 经验库中的已知模式匹配。命中则直接采用已验证的还原路径，大幅缩短分析时间；未命中则走标准 Phase 1-5 流程，**完成后将新经验沉淀回经验库**。
+
+#### 0.5.-1 本域断言 Reverify（v2.9.0 新增前置步骤）
+
+> 如果 Phase 0 步骤 4 加载了已有的域级 Session 档案且包含断言集，在进入指纹采集之前先跑断言验证。
+
+```
+执行条件：Session 档案存在 且 assertions.json 非空
+
+流程：
+  ① 逐条执行断言（script_exists / dispatch_loop_count / anti_crawl_type / cookie_names 等）
+  ② 全部通过 → 跳过 Phase 0.5 的指纹采集，直接进入 Phase 1
+     输出："断言集 N/N 通过，目标站点技术栈未变，跳过重复侦察"
+  ③ 有失败 → 标记失败断言，进入 Phase 0.5 正常流程重新采集
+     输出："断言 #X（类型）失败：期望 Y，实际 Z。目标可能已更新，重新侦察"
+  ④ 将验证结果更新到 assertions.json 的 last_result 和 last_checked
+```
+
+**断言类型速查**：
+
+| 类型 | 检测方法 | 典型用时 |
+|------|---------|---------|
+| `script_exists` | `list_scripts` → 匹配 URL pattern | < 1s |
+| `script_size_range` | `list_scripts` → 检查文件大小 ±20% | < 1s |
+| `dispatch_loop_count` | `find_dispatch_loops` → 比较 case_count ±10 | < 3s |
+| `anti_crawl_type` | `navigate` → 检查 redirect_chain 模式 | < 5s |
+| `cookie_names` | `get_cookies` → 检查 name 列表 | < 1s |
+| `sdk_fingerprint` | `search_code` → 匹配关键词 | < 2s |
+
+详见 `references/domain-session-guide.md` 第 4 节。
 
 #### 0.5.1 快速指纹采集
 
@@ -1063,17 +1132,24 @@ project_name/
 └── README.md               # 项目说明（含接口分析记录）
 ```
 
-### Phase 5：验证与交付
+### Phase 5：断言驱动交付（v2.9.0 升级）
 
 ```
 Actions:
-  1. 运行 main.js，确认输出正确数据
-  2. 与浏览器实际数据交叉验证
-  3. 生成 README.md，记录：
+  1. 运行 main.js / main.py，确认输出正确数据
+  2. 与浏览器实际数据交叉验证（≥ 5 次请求，确认签名稳定性）
+  3. **写入/更新域级 Session 档案**（v2.9.0 新增）：
+     a. 将本次分析的断言集写入 assertions.json（至少包含：script_exists / anti_crawl_type / cookie_names）
+     b. 更新 session.json 的 hot_keys_snapshot 和 cookie_attribution_summary
+     c. 更新 fingerprint.json（如有新的指纹采集数据）
+     d. 更新 assertions_passed / assertions_failed / assertions_total
+     e. 输出："域级 Session 档案已更新，N 条断言已写入，下次分析同域时将自动复用"
+  4. 生成 README.md，记录：
      - 目标信息与接口分析
      - 加密逻辑还原过程
      - 涉及的签名分析技术点
      - 运行方式与依赖说明
+  5. **主动询问用户是否沉淀经验**到 cases/（按 cases/_template.md 格式）
 ```
 
 ## 错误处理准则
@@ -1167,6 +1243,25 @@ Actions:
 **根因**：Camoufox 基于 Firefox 内核，native code 格式含换行缩进；jsdom 的 markNative 输出了 Chrome 单行格式。
 
 **修复**：将 markNative 的返回值从 `"function name() { [native code] }"` 改为 `"function name() {\n    [native code]\n}"`（Firefox 格式）。
+
+### AI 想放弃时的降级梯度表（v2.9.0 新增）
+
+当你觉得"这个搞不定，要不直接上浏览器自动化"时，**必须先走完降级梯度**。每一级至少尝试一次并记录失败原因，才能降到下一级。
+
+| 级别 | 场景 | 当前方案失败表现 | 降级到 | 降级前必须确认 |
+|------|------|-----------------|--------|---------------|
+| L1 | AST 插桩无日志 | `get_instrumentation_log` 返回空，`last_mode_used` 为 `"ast"` | `instrument_jsvmp_source(mode="regex")` | 检查 CSP 是否阻断；确认 `url_pattern` 匹配到了目标脚本 |
+| L2 | regex 插桩覆盖率不足 | `hot_keys` 只有 < 5 个属性，明显不完整 | `hook_jsvmp_interpreter(mode="transparent")` | 确认反爬类型；regex 模式的 `total_edits` 是否 > 0 |
+| L3 | transparent 模式日志太少 | 只能看到 prototype 级 getter，深层属性读取看不到 | `hook_jsvmp_interpreter(mode="proxy")` | **必须确认反爬类型是行为型或纯混淆**，签名型禁用 |
+| L4 | proxy 模式破坏签名 | `navigate` 返回 412 或签名值变化 | 回退到 L2（transparent）+ 手动 `evaluate_js` 补充采集 | 记录 proxy 模式的具体失败表现 |
+| L5 | 所有 runtime 观察都失败 | 签名型反爬 + 源码插桩无效 + transparent 日志不足 | jsdom 环境伪装（路径 B）：不观察 VMP，直接在沙箱中运行 | 确认 jsdom 能加载目标 VMP 脚本 |
+| L6 | jsdom 环境伪装也失败 | 补了 50+ 环境项仍被静默拒绝 | **向用户说明情况**，建议浏览器自动化或 sdenv 方案 | 列出已尝试的所有方案和失败原因 |
+
+**关键规则**：
+- L1→L2→L3 是标准降级路径，每级必须尝试
+- L3→L4 仅对行为型反爬开放，签名型必须走 L3→L5
+- 到达 L6 前必须在 Session 档案中记录完整降级路径
+- **禁止从 L1 直接跳到 L6**
 
 ---
 
@@ -1347,12 +1442,14 @@ MCP 操作：
   - document.hasFocus() → true
   - DOM offsetHeight/Width → 非零值
 MCP 操作：
+  - **load_session / create_session → 加载或创建域级 Session 档案**（v2.9.0）
   - launch_browser → navigate(url, wait_until="domcontentloaded", collect_response_chain=True) → 搭建采集环境
   - compare_env → 采集浏览器基准数据
   - evaluate_js → 分批采集细粒度环境值（4-5 批次）
   - 本地运行 jsdom 对比脚本 → 生成差异报告
   - 迭代修复 → 再次对比 → 直到差异归零 → 端到端验证
-参考：references/jsdom-env-patches.md（补丁模板）、cases/ 经验案例（含双签名变体）
+  - **update_session → 将指纹基准和环境补丁清单写入 Session 档案**（v2.9.0）
+参考：references/jsdom-env-patches.md（补丁模板）、cases/ 经验案例（含双签名变体）、references/domain-session-guide.md（Session 档案）
 ```
 
 ### 场景 11：通用 JSVMP 源码级插桩（RS 5/6 / Akamai sensor_data / webmssdk / obfuscator.io）
@@ -1386,6 +1483,10 @@ MCP 操作：
 核心方法论：源码级插桩 + hot_keys 指纹学习法
 
 黄金 8 步流程（照抄即可，RS/Akamai/webmssdk 通吃）：
+  Step 0 — 加载域级 Session 档案（v2.9.0 新增）
+    load_session(domain="target-domain.com") 或 create_session(domain="target-domain.com")
+    → 如果已有档案且断言通过，可直接复用 anti_crawl_type 和 hot_keys_snapshot，跳过 Step 1-2
+
   Step 1 — 定位 VMP 脚本 URL
     launch_browser(headless=False)
     start_network_capture(capture_body=True)
@@ -1458,8 +1559,9 @@ MCP 操作：
   完工后：
     stop_instrumentation(url_pattern="**/sdenv-*.js")   # 关闭源码级 route
     remove_hooks()                                        # 清 hook
+    update_session(hot_keys=hot_keys_snapshot, cookie_attribution=cookie_summary, assertions=[...])  # v2.9.0: 写入 Session 档案
 
-工具参考：references/jsvmp-source-instrumentation.md（完整方法论）
+工具参考：references/jsvmp-source-instrumentation.md（完整方法论）、references/domain-session-guide.md（Session 档案）
 ```
 
 ## 调试环境保护策略
@@ -1592,7 +1694,7 @@ navigate      launch_browser set_cookies  start_      search_    set_break   hoo
 
 ### 调试工具
 
-- **camoufox-reverse MCP** v0.4.0+ — 反检测浏览器 + Hook + 源码搜索 + 网络分析 + 指纹伪装 + 请求拦截 + JSVMP 源码级插桩 + Cookie 归因分析（65 个工具，一站式逆向分析）
+- **camoufox-reverse MCP** v0.8.0 — 反检测浏览器 + Hook + 源码搜索 + 网络分析 + 指纹伪装 + 请求拦截 + JSVMP 源码级插桩 + Cookie 归因分析 + 域级 Session 档案 + 断言系统（78 个工具，一站式逆向分析）
 
 ## 经验法则
 
@@ -1636,6 +1738,12 @@ navigate      launch_browser set_cookies  start_      search_    set_break   hoo
 38. **环境伪装前先确认签名函数入口**：在开始 6 步法的环境采集之前，先用 `search_code` 确认 JSVMP 的签名入口类型（单通道 XHR / 双通道 XHR+fetch / 导出函数 / cacheOpts 初始化），避免后续截获不完整。
 39. **`navigate` 的 `collect_response_chain` 默认开启**：v0.6.0 起 `navigate` 默认记录完整响应链（含 JS 驱动的重定向），`redirect_chain` 字段比旧版更精确。对签名型反爬的 412→200 判断更可靠。
 40. **经验案例优先匹配 cacheOpts 区分变体**：同一 SDK 体系（webmssdk/byted_acrawler）存在多个变体（单签名 vs 双签名、bdms.paths vs cacheOpts），Phase 0.5 指纹匹配时应优先检测 `cacheOpts` 和 `X-Gnarly` 来区分具体变体，避免套用错误的还原路径。
+41. **域级 Session 档案是跨任务记忆**：同一目标域的反爬类型判定、hot_keys 快照、Cookie 归因结论不应每次从零开始。Phase 0 步骤 4 自动加载 Session 档案，Phase 0.5.-1 跑断言验证，全部通过则跳过重复侦察——对高频分析的目标域可节省 5-10 分钟。
+42. **断言失败是技术变更的早期信号**：`dispatch_loop_count` 断言失败（case 数变化超过 ±10）通常意味着目标更新了 VMP 版本；`cookie_names` 断言失败意味着 Cookie 策略变更。两者都需要重新走完整 Phase 0.5-Phase 5 流程。
+43. **降级梯度必须逐级走**：`instrument_jsvmp_source(mode="ast")` 失败不要直接跳到浏览器自动化——先试 `mode="regex"`，再试 `hook_jsvmp_interpreter(mode="transparent")`，每级记录失败原因。直接跳级会错过 80% 覆盖率的 regex 模式就能解决的场景。
+44. **Session 档案过期不等于失效**：7 天过期策略是提醒机制，不是删除机制。过期档案的反爬类型判定和 hot_keys 快照仍有参考价值，只是需要通过断言验证确认是否仍然有效。
+45. **断言集要精不要多**：每个域 8-15 条断言足够。过多断言（如 50+）会导致 Reverify 耗时过长，失去"30 秒快速检测"的意义。优先覆盖：script_exists + anti_crawl_type + cookie_names + dispatch_loop_count 四个核心类型。
+46. **Session 档案与经验库互补**：Session 档案回答"这个域现在是什么状态"（运行时快照），经验库回答"这类技术方案怎么破"（方法论模板）。两者不能互相替代——新域先建 Session 档案，分析完成后沉淀经验库。
 
 ---
 
@@ -1653,3 +1761,4 @@ navigate      launch_browser set_cookies  start_      search_    set_break   hoo
 | v2.5.0 | 2026-04-17 | **JSVMP 路径 A 升级为四板斧（新增源码级插桩）+ 对齐 MCP v0.4.0**：适配 camoufox-reverse MCP v0.4.0（52→65 个工具）；新增第四板斧「源码级插桩」——在 HTTP 层对 VMP 脚本改写，每个 `obj[key]` / `fn(args)` 都插入 tap，对RS 5/6、Akamai sensor_data v2/v3、webmssdk、obfuscator.io 通用有效；新增 8 个 MCP 工具清单（`instrument_jsvmp_source`/`get_instrumentation_log`/`get_instrumentation_status`/`stop_instrumentation`/`find_dispatch_loops`/`reload_with_hooks`/`analyze_cookie_sources`/`get_runtime_probe_log`）；`hook_jsvmp_interpreter` 从单路径 apply 升级为多路径（apply/call/bind + Reflect.*/Proxy 全局对象 + timing/random）；`inject_hook_preset` 新增 `cookie`（原型链级 cookie hook）和 `runtime_probe`（低开销广谱运行时探针）两个预设；`navigate` 支持 `pre_inject_hooks` + `via_blank` + 返回 `initial_status`/`final_status`/`redirect_chain`，解决首屏挑战页 hook 失效；新增场景 11「通用 JSVMP 源码级插桩」（黄金 8 步流程）；场景 2「动态 Cookie」引入 `analyze_cookie_sources` 作为第一步归因；新增 `references/jsvmp-source-instrumentation.md` 源码级插桩专项指南（regex vs ast 模式选择、hot_keys 指纹学习法、与 hook 探针互补）；经验法则扩充至 27 条（+源码级插桩优先 / hot_keys 指纹学习法 / Cookie 归因优先于 setter hook / 首屏 pre_inject_hooks / reload_with_hooks 取代裸 reload）；新增骨架案例 `cases/universal-vmp-source-instrumentation.md` |
 | v2.6.0 | 2026-04-18 | **签名型反爬兼容对齐 MCP v0.5.0**：新增顶层决策框架「反爬类型三分法」（签名型/行为型/纯混淆），放在 Phase 0.5 之前作为必做识别步骤；四板斧新增"适用反爬类型"标签，明确前三板斧对签名型不可用，源码级插桩是签名型的唯一通用解；`hook_jsvmp_interpreter` 新增 `mode` 参数（"proxy"/"transparent"），transparent 模式仅替换 prototype getter 不装 Proxy，作为签名安全备选；`instrument_jsvmp_source(mode="ast")` 从页面内 Acorn 迁到 MCP 侧 esprima（零 CDN 依赖，挑战页可用），新增 `fallback_on_error` 参数和 `last_mode_used` 状态字段；`pre_inject_hooks` 参数明确标注对签名型反爬不可用（症状：redirect_chain 反复 412）；场景 9（反检测站点）按反爬类型分档重写；错误处理新增"观察者效应"专项排查；新增经验法则 28-32 条；场景 11 加签名型前置检查；引用文档 `references/jsvmp-source-instrumentation.md` 需同步更新 AST 迁移与 transparent 模式 |
 | v2.7.0 | 2026-04-20 | **双签名场景支持 + 对齐 MCP v0.6.0（65→68 个工具）**：新增案例 `jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox.md`（JSVMP 双签名 X-Bogus + X-Gnarly + XHR/fetch 双通道拦截 + cacheOpts 初始化 + jsdom Firefox 环境伪装）；环境伪装六步法新增「步骤 0.5：确认签名函数入口」（区分单通道/双通道/导出函数/cacheOpts 初始化）；MCP v0.6.0 新增 3 个工具（`check_csp_policy`/`get_response_chain`/`get_dual_sign_data`），`instrument_jsvmp_source` 支持 `csp_bypass=True` 自动绕过 CSP 限制，`navigate` 的 `collect_response_chain` 默认开启；场景 10 的 navigate 补充 `wait_until` 和 `collect_response_chain` 参数；场景 11 的 Step 3 新增 CSP 预检流程；工具配合模式更新（新增反爬类型识别前置步骤 + 双签名额外步骤）；错误处理新增三类排查（双签名截获不完整 / CSP 策略阻断插桩 / Firefox native code 格式不匹配）；经验法则扩充至 40 条（+双签名双通道 / cacheOpts 必传 / Firefox 格式 native code / got-scraping TLS / CSP 预检 / 签名入口确认 / collect_response_chain / 变体区分）；案例模板 `_template.md` 新增「反爬类型判定」和「关键经验总结」段；`cases/README.md` 新增指纹匹配快速参考表和变体关系图 |
+| v2.9.0 | 2026-04-22 | **域级 Session 档案 + 断言驱动交付 + 对齐 MCP v0.8.0（68→78 个工具）**：新增域级 Session 档案系统（`cases/_session_archives/<domain-hash>/`，跨任务复用反爬类型判定/指纹基准/Cookie 归因结论，7 天有效期 + 自动过期提醒）；新增断言系统（8 种断言类型：script_exists / script_size_range / dispatch_loop_count / anti_crawl_type / cookie_names / sdk_fingerprint / hot_keys_stable / response_structure）；Phase 0 新增步骤 4「启动域级 Session 档案」；Phase 0.5 新增前置步骤 0.5.-1「本域断言 Reverify」（断言全部通过则跳过重复侦察）；Phase 5 升级为断言驱动交付（写入 Session 档案 + 断言集 + 主动询问经验沉淀）；第一原则新增第 5 条「禁止未经梯度降级切换」；错误处理新增「AI 想放弃时的降级梯度表」（L1-L6 六级降级路径）；核心武器章节更新至 v0.8.0（78 工具），新增域级 Session 档案与断言小节；场景 10/11 MCP 操作清单追加 Session 相关步骤；经验法则扩充至 46 条（+Session 档案跨任务记忆 / 断言失败早期信号 / 降级梯度逐级走 / 过期不等于失效 / 断言集要精不要多 / Session 与经验库互补）；新增 `references/domain-session-guide.md`；新增 `CHANGELOG_v2.9.0.md`；`cases/README.md` 新案例沉淀工作流插入步骤 1.5（Session 档案归档）；`.gitignore` 追加 `cases/_session_archives/` |

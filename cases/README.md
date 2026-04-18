@@ -64,6 +64,7 @@ RS JSVMP + Cookie 签名
 ## 新增案例
 
 1. 复制 `_template.md` 为新文件，以技术特征命名
+1.5. **归档 Session 档案**（v2.9.0 新增）：如果本次分析过程中创建了域级 Session 档案（`cases/_session_archives/<domain-hash>/`），确认断言集已写入且通过验证。Session 档案会自动被 `.gitignore` 排除，但其中的技术结论（反爬类型、hot_keys 快照）应同步体现在案例文件的「技术指纹」和「加密方案」段中。
 2. 按模板格式填写各段（v2.7.0 起模板新增「反爬类型判定」和「关键经验总结」段）
 3. 更新本文件的案例索引表
 4. 可选：在 `_private_mapping.json` 中添加私有域名映射
