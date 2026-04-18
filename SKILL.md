@@ -43,16 +43,46 @@ AI 输出格式（必须以此结构复述并填空）：
   主要特征关键词 = ______ (如 "webmssdk / X-Bogus / a_bogus / RS 412 / sdenv / acw_sc__v2" 等)
   
   速查表（内嵌，免去路径问题）:
-    tiktok.com / X-Bogus / X-Gnarly / webmssdk / cacheOpts
-      → case: jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox.md | 方案: jsdom 环境伪装
-    douyin.com / a_bogus / _sdkGlueInit
-      → case: jsvmp-xhr-interceptor-env-emulation.md | 方案: vm 沙箱 + 自定义字符表
-    nmpa.gov.cn / NfBCSins2OywS / 412 挑战 / sdenv
-      → case: jsvmp-ruishu6-cookie-412-sdenv.md | 方案: sdenv 纯 Node.js
-    FSSBBIl1UgzbN7N / _RSG / 200KB 混淆 JS + 412
-      → 同 nmpa 案例 | 方案: sdenv
-    obfuscator.io 特征（_0x 大量前缀）
-      → 无专案，走通用四板斧
+
+    ┌─ douyin.com / a_bogus / _sdkGlueInit / byted_acrawler
+    │  case: jsvmp-xhr-interceptor-env-emulation.md
+    │  方案: jsdom 环境伪装（喂入-截出策略）
+    │  核心路径:
+    │    1. search_code("bdms") → 找 webmssdk.es5.js(387KB) + bdms.js + sdk-glue.js 三个 CDN 地址
+    │    2. search_code("enablePathList") → 定位 sdk-glue 中的路径配置
+    │    3. 页面 inline script 找 _SdkGlueInit 调用及 paths 配置
+    │    4. jsdom(runScripts:'dangerously') 依次加载三脚本 + 调用 _SdkGlueInit
+    │    5. JSVMP 修改 XMLHttpRequest.prototype.open → 匹配 enablePathList 的 URL 自动追加 a_bogus
+    │    6. 在 jsdom 内发 XHR → Hook 截获带 a_bogus 的最终 URL
+    │    7. 关键：patchEnvironment() 修复 58 项环境差异（markNative 三层防御 + plugins + DOM 布局）
+    │    8. 服务端静默拒绝(200+空body) = 环境指纹不匹配，回去补环境
+    │  可验证事实: a_bogus 约 192 字符 Base64 变体 | webdriver===false | plugins.length===5
+    │
+    ├─ tiktok.com / X-Bogus / X-Gnarly / webmssdk / cacheOpts
+    │  case: jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox.md
+    │  方案: jsdom 环境伪装（双签名：XHR 追加 X-Bogus + fetch 注入 X-Gnarly）
+    │  核心路径:
+    │    1. 同上三脚本，但初始化必须传 cacheOpts（新版 SDK 必传项）
+    │    2. 同时 Hook XHR + fetch 两个通道（只 Hook 一个会丢另一半签名）
+    │    3. markNative 必须输出 Firefox 格式: "function name() {\n    [native code]\n}"
+    │       （Camoufox 基于 Firefox 内核，Chrome 单行格式会被检测）
+    │    4. got-scraping 替代 axios 模拟 Firefox TLS 指纹
+    │  可验证事实: X-Bogus ~192 字符 | X-Gnarly ~130 字符 | cacheOpts.paths 覆盖目标 API
+    │
+    ├─ nmpa.gov.cn / NfBCSins2OywS / 412 挑战 / sdenv
+    │  case: jsvmp-ruishu6-cookie-412-sdenv.md
+    │  方案: sdenv（魔改 jsdom + C++ V8 Addon）纯 Node.js 执行 RS VMP
+    │  核心路径:
+    │    1. navigate 不加 hook → 观察 412→200 redirect_chain 确认签名型
+    │    2. instrumentation(action='install', mode="ast") 源码级插桩（唯一不破坏签名的观察手段）
+    │    3. sdenv jsdomFromUrl 执行 RS VMP 生成 cookie
+    │    4. ❌ 禁止用 Playwright 过 412 挑战取 cookie（红线 3）
+    │
+    ├─ FSSBBIl1UgzbN7N / _RSG / 200KB 混淆 JS + 412
+    │  → 同 nmpa 案例（瑞数通用）
+    │
+    └─ obfuscator.io 特征（_0x 大量前缀）
+       → 无专案，走通用四板斧（references/path-a-four-tools.md）
   
   命中结果:
     - 命中案例 = ______ (case 文件名 or "未命中")
