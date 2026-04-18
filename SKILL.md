@@ -32,16 +32,32 @@ AI 输出格式（必须以此结构复述并填空）：
         browser 状态 = ______ (not started / running / running with residuals)
   通过: YES / NO
 
-[CHECK-2] 经验库速查（cases/ 目录是唯一的经验库）
+[CHECK-2] 经验库速查（本 skill 仓库的 cases/ 目录是唯一的经验库）
+  ⚠️ cases/ 在 **skill 仓库**内，不是用户当前工作目录！
+     skill 仓库路径 = 本 SKILL.md 所在目录（激活 skill 时已加载）
+     如果 cases/ 在当前 cwd 下不存在，说明你在用户项目目录——
+     请通过 skill 上下文（本文档同级的 cases/ 目录）读取，
+     或直接引用下方内嵌的速查表。
+  
   目标域名 = ______
   主要特征关键词 = ______ (如 "webmssdk / X-Bogus / a_bogus / RS 412 / sdenv / acw_sc__v2" 等)
-  操作:
-    1. 读 cases/README.md 的"高频站点速查表"查关键词命中
-    2. listDirectory cases/ 看完整文件列表
+  
+  速查表（内嵌，免去路径问题）:
+    tiktok.com / X-Bogus / X-Gnarly / webmssdk / cacheOpts
+      → case: jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox.md | 方案: jsdom 环境伪装
+    douyin.com / a_bogus / _sdkGlueInit
+      → case: jsvmp-xhr-interceptor-env-emulation.md | 方案: vm 沙箱 + 自定义字符表
+    nmpa.gov.cn / NfBCSins2OywS / 412 挑战 / sdenv
+      → case: jsvmp-ruishu6-cookie-412-sdenv.md | 方案: sdenv 纯 Node.js
+    FSSBBIl1UgzbN7N / _RSG / 200KB 混淆 JS + 412
+      → 同 nmpa 案例 | 方案: sdenv
+    obfuscator.io 特征（_0x 大量前缀）
+      → 无专案，走通用四板斧
+  
   命中结果:
     - 命中案例 = ______ (case 文件名 or "未命中")
-    - 若命中 → 本分析**优先复用该案例的已验证方案**，不要从零分析
-    - 若未命中 → 本次分析结束时必须沉淀新案例到 cases/
+    - 若命中 → 读取该 case 文件（在 skill 仓库 cases/ 下），**优先复用已验证方案**
+    - 若未命中 → 本次分析结束时沉淀新案例到 skill 仓库 cases/
 
 [CHECK-3] 最终方案意图声明（用户面向）
   本次目标: ______ (一句话)
@@ -55,8 +71,8 @@ AI 输出格式（必须以此结构复述并填空）：
 ```
 
 如果 [CHECK-1] 失败 → 停止，让用户先确认 MCP 环境
-如果 [CHECK-2] 命中已有案例 → 优先复用该案例，不要从零
-如果 [CHECK-2] 未命中 → 记录本次分析结束时要沉淀新 case 文件到 cases/
+如果 [CHECK-2] 命中已有案例 → 从 skill 仓库 cases/ 读取该 case 文件，优先复用
+如果 [CHECK-2] 未命中 → 记录本次分析结束时要沉淀新 case 文件到 skill 仓库 cases/
 [CHECK-3] 意图声明必须明确，防止后续滑坡到浏览器方案
 
 ---
@@ -375,5 +391,3 @@ search_code(keyword="acw_sc__v2")       # Aliyun WAF
 | v3.2.0 | 2026-04-18 | 移除 MCP session 依赖：Checklist 从五项压缩到三项，删除 domain-session-guide.md，cases/ 成为唯一经验库，verify_signer_offline 替代 verify_against_session |
 | v3.1.0 | 2026-04-18 | SKILL.md 瘦身，references/ 拆分 5 个新子文档；工具引用对齐 MCP 合并 API |
 | v3.0.0 | 2026-04-18 | 硬约束 Checklist + 红线四条 + 经验法则压缩 46→30 + common-pitfalls.md |
-
-完整历史见 `CHANGELOG_v*.md`。
