@@ -45,8 +45,9 @@ AI 输出格式（必须以此结构复述并填空）：
   速查表（内嵌，免去路径问题）:
     tiktok.com / X-Bogus / X-Gnarly / webmssdk / cacheOpts
       → case: jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox.md | 方案: jsdom 环境伪装
-    douyin.com / a_bogus / _sdkGlueInit
-      → case: jsvmp-xhr-interceptor-env-emulation.md | 方案: vm 沙箱 + 自定义字符表
+    ├─ douyin.com / a_bogus / _sdkGlueInit / byted_acrawler
+    │  → case: jsvmp-xhr-interceptor-env-emulation.md | 方案: jsdom 环境伪装（喂入-截出）
+    │  ⚠️ 关键踩坑: ttwid 需从浏览器导出; JSON.stringify/parse 必须显式 markNative; resources:'usable' 是拦截器激活必要条件
     nmpa.gov.cn / NfBCSins2OywS / 412 挑战 / sdenv
       → case: jsvmp-ruishu6-cookie-412-sdenv.md | 方案: sdenv 纯 Node.js
     FSSBBIl1UgzbN7N / _RSG / 200KB 混淆 JS + 412
