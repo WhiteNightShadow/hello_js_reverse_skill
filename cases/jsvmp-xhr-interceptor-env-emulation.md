@@ -72,7 +72,30 @@
 
 ---
 
-## 已验证定位路径（Phase 0.5 命中后直接执行）
+## 方案方向
+
+jsdom 环境伪装，喂入-截出策略截获 a_bogus。环境值必须与 UA 自洽。
+
+## 各 Phase 加速指引
+
+- **Phase 1**: `search_code(keyword="_SdkGlueInit")` 定位配置；`scripts(action='save')` 保存三件套（webmssdk.es5.js / bdms.js / sdk-glue.js）到 `config/`
+- **Phase 2**: 加载顺序 webmssdk → bdms → sdk-glue → `_SdkGlueInit`；签名在 XHR send 阶段追加
+- **Phase 3**: 用 Camoufox `compare_env` + `evaluate_js` 分批采集真实环境，与 jsdom 逐项 diff，**确认需要补的环境项范围后再写补丁**
+- **Phase 4**: jsdom 配置需 `resources:'usable'`；XHR Hook 必须在 SDK 加载前安装；`scanPrototypeChain` 的 `Object.prototype` 边界不能突破
+- **Phase 5**: 连续 ≥5 次请求验证，200 + 空 body = 环境指纹不对不是算法错
+
+## 踩坑记录
+
+- **不要对 Object.prototype / Array.prototype 做 markNative**，会破坏 JSVMP 自身运行
+- **SDK 脚本必须保存到本地**（`scripts(action='save')`），不要每次从 CDN 下载
+- 签名 192 字符但服务端返回空 body = 环境指纹不对，不是算法错
+- **环境补丁逐项添加逐项验证**，不要批量添加后排查
+- Firefox 和 Chrome 环境都可以工作，关键是所有值与 UA 自洽
+- XHR Hook 顺序：我方 Hook → SDK 加载（保存 Hook 后的引用）→ JSVMP 调用时经过我方 Hook
+
+## 原始定位路径（参考，不要跳过 Phase 直接照做）
+
+> 以下是首次分析时的实际步骤记录，供理解方案演进过程。实战时仍需走 Phase 1-5。
 
 ### Phase 1：网络捕获定位接口
 
