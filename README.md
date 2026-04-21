@@ -25,7 +25,8 @@
 在你的 AI 编码工具（Cursor / Claude Code / codex 等）的对话框中输入：
 
 ```
-请帮我配置skill并在后续触发相关操作的时候查阅该skill：https://github.com/WhiteNightShadow/hello_js_reverse_skill
+帮我安装下这个skill：hello_js_reverse_skill
+项目地址：https://github.com/WhiteNightShadow/hello_js_reverse_skill
 ```
 
 AI 会自动完成下载、配置，并在后续 JS 逆向相关任务中自动调用该 Skill。
