@@ -645,12 +645,10 @@ Actions:
 │   → close_browser() 关闭当前浏览器（如已启动）
 │   → launch_browser(enable_trace=True)
 │   → navigate(url="目标页面")
-│   → trace_property_access(duration=0, mode="summary")
-│   → 获得 JSVMP 实际读取的属性列表（精准，C++ 层拦截，JSVMP 不可检测）
-│   → 用 evaluate_js 从浏览器读取这些属性的真实值（禁止自己编造值！）
-│   → 示例：trace 返回 navigator.userAgent 被读取
-│     → evaluate_js("navigator.userAgent") 获取真实值
-│     → 或批量：evaluate_js("JSON.stringify({ua:navigator.userAgent, sw:screen.width, ...})")
+│   → trace_property_access(duration=0, mode="summary", collect_values=True)
+│   → 获得 JSVMP 实际读取的属性列表 + 真实值（精准，C++ 层拦截，JSVMP 不可检测）
+│   → collect_values=True 自动从浏览器读取所有属性的真实值
+│     （大值如 Canvas dataURL、WebGL extensions 自动保存到 ~/.cache/camoufox-reverse/values/）
 │   → 只补这些属性（狙击式补环境）
 │
 └─ NO（官方 Camoufox 或未启用 trace）
