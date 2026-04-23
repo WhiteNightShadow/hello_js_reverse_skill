@@ -200,7 +200,7 @@ AI 输出格式（必须以此结构复述并填空）：
 ### 启动流程
 
 ```
-launch_browser(headless=false)
+launch_browser(headless=false, enable_trace=true)
 → navigate(url="目标URL")
 → cookies(action='set', cookies_list=[...])  # 如有 Cookie
 → reload()                                    # 使 Cookie 生效
@@ -247,8 +247,9 @@ launch_browser(headless=false)
 
 ```
 MCP 操作：
-  launch_browser(headless=false)
-  → 启动反检测浏览器
+  launch_browser(headless=false, enable_trace=true)
+  → 启动反检测浏览器（enable_trace=true 启用引擎层属性追踪，
+     需要 camoufox-reverse 定制版浏览器；未安装时自动忽略，不影响其他功能）
 
   navigate(url="目标URL")
   → 导航到目标页面
