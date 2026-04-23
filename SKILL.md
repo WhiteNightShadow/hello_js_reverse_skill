@@ -647,6 +647,10 @@ Actions:
 │   → navigate(url="目标页面")
 │   → trace_property_access(duration=0, mode="summary")
 │   → 获得 JSVMP 实际读取的属性列表（精准，C++ 层拦截，JSVMP 不可检测）
+│   → 用 evaluate_js 从浏览器读取这些属性的真实值（禁止自己编造值！）
+│   → 示例：trace 返回 navigator.userAgent 被读取
+│     → evaluate_js("navigator.userAgent") 获取真实值
+│     → 或批量：evaluate_js("JSON.stringify({ua:navigator.userAgent, sw:screen.width, ...})")
 │   → 只补这些属性（狙击式补环境）
 │
 └─ NO（官方 Camoufox 或未启用 trace）
@@ -837,6 +841,14 @@ Actions:
 | README.md | ✅ | 项目说明 + 接口分析记录 |
 | ≥ 5 次请求验证 | ✅ | 确认签名稳定性 |
 | cases/ 经验沉淀 | 推荐 | 主动询问用户 |
+
+#### 5.5 关闭浏览器
+
+```
+Actions:
+- close_browser()  → 释放浏览器资源
+  ⚠️ 分析完成后必须关闭浏览器，不要让浏览器一直开着占用资源
+```
 
 ---
 
