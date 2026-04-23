@@ -4,7 +4,7 @@ description: >
   Node.js / Python 接口自动化与签名还原工程技能：对自有平台或已授权平台的 Web API 进行签名分析与接口对接，
   通过 Camoufox 反检测浏览器动态调试与静态源码分析，定位并还原前端加密/签名逻辑，
   使用 Node.js 或 Python 实现算法复现与自动化接口调用。
-  深度集成 camoufox-reverse MCP（C++ 引擎级指纹伪装，32 个逆向分析工具）。
+  深度集成 camoufox-reverse MCP（C++ 引擎级指纹伪装，35 个逆向分析工具）。
   擅长 JSVMP 虚拟机保护的双路径攻克：路径 A 算法追踪（Hook / 插桩 / 日志分析 / 源码级插桩四板斧），
   路径 B 环境伪装（jsdom/vm 沙箱 + 浏览器环境采集对比 + 全量补丁）。
   v3.0.0 硬约束 Checklist + 红线四条 + 经验法则压缩。
@@ -631,6 +631,45 @@ Actions:
 ### Phase 3：动态验证
 
 对静态分析的结论，在调试浏览器页面上进行运行时验证。
+
+#### 3.0 环境指纹采集（路径 B 核心突破点）
+
+> v3.4.0 新增。用于路径 B 环境伪装时精准确定"JSVMP 读了哪些属性"。
+
+```
+判断 camoufox-reverse 定制版是否可用：
+  check_environment() → camoufox_reverse.installed
+
+├─ YES（已装定制版 + trace_active）
+│   → close_browser() 关闭当前浏览器（如已启动）
+│   → launch_browser(enable_trace=True)
+│   → navigate(url="目标页面")
+│   → trace_property_access(duration=0, mode="summary")
+│   → 获得 JSVMP 实际读取的属性列表（精准，C++ 层拦截，JSVMP 不可检测）
+│   → 只补这些属性（狙击式补环境）
+│
+└─ NO（官方 Camoufox 或未启用 trace）
+    → compare_env() + 分批 evaluate_js 采集
+    → 与 jsdom 环境全量 diff
+    → 按影响分级修复（撒网式补环境）
+    → 此为 v3.3.0 的传统流程，未破坏
+```
+
+**为什么引擎层 trace 更精准**：
+- `trace_property_access` 返回的是 JSVMP **实际访问过**的属性，按热度排序
+- `compare_env` 返回的是"所有不同的属性"，其中大部分 JSVMP 根本不读
+- 两者输出量级差异：trace 通常 30-50 项；compare_env 通常几百项
+
+**多视图查询**（按需深入）：
+
+| mode | 用途 | 场景 |
+|---|---|---|
+| summary（默认） | 属性热度统计 | 补环境时看"要补哪些" |
+| timeline | 按时间分桶 | 看"什么时候访问什么"，定位检测阶段 |
+| sequence | 按顺序返回事件 | 看"访问顺序"，重建检测逻辑 |
+| search | 搜索特定字符串 | 找"有没有访问 cookie / canvas / userAgent" |
+
+**定制版安装**：从 https://github.com/WhiteNightShadow/camoufox-reverse/releases 下载对应平台 zip，替换 Camoufox 缓存目录。不装对其他 32 个工具无影响。
 
 #### 3.1 Hook 注入验证
 
@@ -1285,3 +1324,14 @@ verify_signer_offline(
 ---
 
 
+
+## 更新记录
+
+| 版本 | 日期 | 要点 |
+|------|------|------|
+| v3.4.0 | 2026-04-22 | Phase 3 新增引擎层追踪分支（trace_property_access）。依赖 camoufox-reverse 定制版浏览器 + MCP v1.1.0。装了定制版后补环境从"全量 diff"升级到"精准 trace"，未装定制版自动降级到 compare_env，无破坏性变化。JS 层零痕迹，JSVMP 不可检测 |
+| v3.3.1 | 2026-04-19 | 经验法则精简至 22 条：移除单站点经验，合并 evaluate_js 规则 |
+| v3.3.0 | 2026-04-19 | 核心层回归扩容：Phase 1-5 详细动作 + 10 个场景速查 + 经验法则回迁核心层 |
+| v3.2.0 | 2026-04-18 | 移除 MCP session 依赖，Checklist 压缩到三项，cases/ 成为唯一经验库 |
+| v3.1.0 | 2026-04-18 | SKILL.md 瘦身，references/ 拆分子文档，工具引用对齐 MCP 合并 API |
+| v3.0.0 | 2026-04-18 | 硬约束 Checklist + 红线四条 + 经验法则压缩 |
