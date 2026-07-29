@@ -489,15 +489,14 @@ await navigate(url, pre_inject_hooks=["jsvmp_probe_transparent"])
 # 1. 先确认是不是 VMP（case_count > 50 基本是）
 [camoufox-reverse] search_code(keyword='switch', script_url="https://target.com/sdenv-xxx.js", context_chars=500) <!-- v3.1.0: migrated from find_dispatch_loops -->
 
-# 2. 装插桩（AST 模式优先，需 CDN；regex 模式兜底）
+# 2. 装插桩（AST 在 MCP 侧运行；regex 模式兜底）
 [camoufox-reverse] instrumentation(action='install', <!-- v3.1.0: migrated from instrument_jsvmp_source -->
     url_pattern="**/sdenv-*.js",    # glob 模式匹配多 hash 版本
     mode="ast",                      # 或 "regex"
     tag="vmp1",                      # 区分多 VMP 的标签
     rewrite_member_access=True,      # 改写每个 obj[key]
     rewrite_calls=True,              # 改写每个 fn(args) / obj.method(args)
-    max_rewrites=5000,               # 单文件改写上限
-    cache_rewritten=True             # 缓存改写后源码
+    max_rewrites=5000                # 单文件改写上限
 )
 
 # 3. 装完后必须重载让插桩生效
@@ -538,17 +537,9 @@ await instrumentation(action='install', url_pattern="**/sdenv-*.js", <!-- v3.1.0
 )
 
 # 查看实际走了哪条路径
-status = await check_environment() <!-- v3.1.0: migrated from get_instrumentation_status -->
+status = await instrumentation(action='status')
 # status["active_patterns"][0]["last_mode_used"] == "ast" (正常)
 #   or "regex (fallback)" (esprima 对该 VMP 的语法支持不全)
-#   or "ast_page" (你显式用了 deprecated 模式)
-```
-
-**新增取值 mode="ast_page"**：
-```python
-# 仅用于 A/B 对比 v0.4.x 的旧页面内 Acorn 实现，deprecated
-# 生产不要用，挑战页会因 CDN 被拦静默失败
-await instrumentation(action='install', url_pattern="**/vmp.js", mode="ast_page") <!-- v3.1.0: migrated from instrument_jsvmp_source -->
 ```
 
 ### 使用 Cookie 归因分析（v2.5.0 新增）

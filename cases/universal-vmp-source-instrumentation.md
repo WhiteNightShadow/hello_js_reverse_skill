@@ -183,10 +183,10 @@ function genSign(input) {
 ## 踩坑记录
 
 - **坑 1：instrument_jsvmp_source 必须在 navigate/reload 之前调用**——route 注册晚了就抓不到 VMP 脚本加载
-- **坑 2：AST 模式需要 cdnjs 访问**——代理环境下要保证 `cdnjs.cloudflare.com` 可访问，否则降级到 `mode="regex"`
+- **坑 2：AST 模式从 MCP v0.5.0 起在 MCP 侧使用 esprima，不依赖页面 CDN**——若原始源码 parse 失败或改写产物未执行，再降级到 `mode="regex"`
 - **坑 3：reload_with_hooks 只刷当前页，不改变 URL**——首屏挑战场景要用 `navigate(pre_inject_hooks=[...])` 而不是 reload_with_hooks
 - **坑 4：hot_keys 里 "[key of Symbol()]"**——这是 Symbol 键被 preview 化的表现，不是真实属性名，可以忽略
-- **坑 5：同一个 VMP 被多次加载（HMR / 页面跳转）** → 确保 `cache_rewritten=True`，否则每次重写开销巨大
+- **坑 5：同一个 VMP 被多次加载（HMR / 页面跳转）** → MCP 会按 URL 缓存改写结果；当前接口不需要传缓存参数
 - **坑 6：VMP 通过 eval / new Function 动态生成子 VMP** → 源码级插桩看不到动态生成的部分，需要额外 `hook_function(Function, ...)` 截获
 - **坑 7：Proxy（jsvmp_hook）与源码级插桩叠加时页面崩溃** → 尝试 `hook_jsvmp_interpreter(track_props=False)` 关闭 Proxy，只留 apply/Reflect.*
 

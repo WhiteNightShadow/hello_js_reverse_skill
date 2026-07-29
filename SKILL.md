@@ -12,7 +12,7 @@ description: >
   v3.2.0 移除 MCP session 依赖，Checklist 从五项压缩到三项，cases/ 成为唯一经验库。
   v3.3.0 核心层回归扩容：Phase 1-5 详细动作 + 10 个场景速查 + 经验法则回迁核心层。
   v3.3.1 经验法则精简至 22 条：移除单站点经验，合并 evaluate_js 规则。
-argument-hint: "<目标URL> [需要分析的加密参数名, 如 sign, m, token]"
+  v3.4.1 增加 AST 源码插桩执行健康门禁，区分原始源码解析失败与改写产物执行失败。
 ---
 
 # ⚠️ 硬约束 Checklist（分析启动前必做，不可跳过）
@@ -517,6 +517,14 @@ Actions:
   步骤 9：instrumentation(action='install',
            url_pattern="**/<VMP文件>", mode="ast", tag="vmp1")
   步骤 10：instrumentation(action='reload') → 重载让插桩先于 VMP 生效
+  步骤 10.5：验证插桩实际执行（不可跳过）
+           instrumentation(action='status') → 确认 files_rewritten > 0
+           evaluate_js(expression="(() => ({
+             tapInstalled: window.__mcp_tap_installed === true,
+             logReady: Array.isArray(window.__mcp_vmp_log)
+           }))()")
+           → files_rewritten > 0 但 tapInstalled=false：
+             优先判定为改写产物未解析/未执行，不要误判为原始源码 esprima parse 失败
   步骤 11：instrumentation(action='log', tag_filter="vmp1", type_filter="tap_get")
            → hot_keys 是 VMP 读取的环境属性 top 30
   步骤 12：instrumentation(action='log', tag_filter="vmp1", type_filter="tap_method")
@@ -861,12 +869,14 @@ Actions:
 
 梯度 1: 检查手头已抓的证据
   → list_network_requests 看已抓的请求够不够分析
+  → instrumentation(action='status') 确认 files_rewritten / last_mode_used
+  → evaluate_js 检查 __mcp_tap_installed 与 __mcp_vmp_log
   → instrumentation(action='log') 看插桩事件
   → 如果已有证据没充分用 → 回去用
 
 梯度 2: 换 Hook 模式 / 插桩模式
   → proxy ↔ transparent
-  → ast ↔ regex（CSP 拦截时走 regex）
+  → ast ↔ regex（原始源码解析失败或改写产物未执行时走 regex）
 
 梯度 3: 点对点 hook_function
   → hook_function(function_path=<具体签名函数>, mode='trace')
@@ -1340,6 +1350,7 @@ verify_signer_offline(
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.4.1 | 2026-07-29 | 增加 AST 插桩执行健康门禁：`files_rewritten` 只表示完成改写，必须继续验证 runtime 标记；失败时按通用梯度降级，不引入站点特例 |
 | v3.4.0 | 2026-04-22 | Phase 3 新增引擎层追踪分支（trace_property_access）。依赖 camoufox-reverse 定制版浏览器 + MCP v1.1.0。装了定制版后补环境从"全量 diff"升级到"精准 trace"，未装定制版自动降级到 compare_env，无破坏性变化。JS 层零痕迹，JSVMP 不可检测 |
 | v3.3.1 | 2026-04-19 | 经验法则精简至 22 条：移除单站点经验，合并 evaluate_js 规则 |
 | v3.3.0 | 2026-04-19 | 核心层回归扩容：Phase 1-5 详细动作 + 10 个场景速查 + 经验法则回迁核心层 |

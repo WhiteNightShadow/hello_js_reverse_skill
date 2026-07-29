@@ -4,7 +4,7 @@
 >
 > **前置要求**：已完成反爬类型三分法识别（见 SKILL.md「反爬类型识别与工具选择」段）
 >
-> **版本**：v3.1.0（MCP v0.9.0 工具名迁移）
+> **版本**：v3.4.1（MCP v1.1.1，增加 AST 插桩执行健康门禁）
 
 ---
 
@@ -23,7 +23,7 @@
 | 第一斧 | Hook I/O | `inject_hook_preset(xhr/fetch/crypto/cookie)` + `hook_function('X.prototype.Y', mode='intercept', ...)` <!-- v3.1.0: migrated from freeze_prototype --> | 请求链路劫持、动态 Cookie、加密原语入口 | VM 内部自实现的 MD5/AES | 行为型 ✅ / 纯混淆 ✅ / 签名型 ❌ |
 | 第二斧 | 插桩解释器 | `hook_function(path, mode='trace', ...)` <!-- v3.1.0: migrated from trace_function --> + `hook_jsvmp_interpreter(mode='proxy', trackProps=True)` <!-- v3.1.0: migrated from trace_property_access --> | 能识别分发函数名时的调用链追踪 | 匿名 IIFE 包裹 + 高频日志爆炸 | 行为型 ✅ / 纯混淆 ✅ / 签名型 ❌ |
 | 第三斧 | 日志分析 | `get_jsvmp_log` + 反向追踪 | 已能捕获签名值 I/O 时反推公式 | 签名完全不出 VM 的黑箱模式 | 所有类型 ✅（纯被动分析，无副作用） |
-| 第四斧 | 源码级插桩 | `instrumentation(action='install', ...)` <!-- v3.1.0: migrated from instrument_jsvmp_source --> + `instrumentation(action='log', ...)` <!-- v3.1.0: migrated from get_instrumentation_log --> | VM 内部调度、"全部在 opcode dispatch 循环里发生"的场景，`hot_keys` 直接暴露环境指纹集 | 极限大文件（5MB+）regex 模式覆盖率下降；AST 模式需 CDN | 所有类型 ✅，**签名型首选** |
+| 第四斧 | 源码级插桩 | `instrumentation(action='install', ...)` <!-- v3.1.0: migrated from instrument_jsvmp_source --> + `instrumentation(action='log', ...)` <!-- v3.1.0: migrated from get_instrumentation_log --> | VM 内部调度、"全部在 opcode dispatch 循环里发生"的场景，`hot_keys` 直接暴露环境指纹集 | 极限大文件（5MB+）开销高；改写后必须验证 runtime 已执行 | 所有类型 ✅，**签名型首选** |
 
 ### 按反爬类型的适用性
 
@@ -56,7 +56,7 @@
 步骤 4：装源码级插桩（核心）
   instrumentation(action='install', url_pattern="**/<VMP 文件>", mode="ast", tag="vmp1")
   <!-- v3.1.0: migrated from instrument_jsvmp_source -->
-  （AST 模式覆盖率高，页面能联网时优先）
+  （AST 在 MCP 侧运行，不依赖页面联网）
 
 步骤 5：让所有探针先于 VMP 生效
   instrumentation(action='reload')
@@ -67,7 +67,7 @@
   evaluate_js / click / type_text → 翻页、搜索、登录等
 
 步骤 7：读 hot_keys（30 秒定位环境指纹集）
-  instrumentation(action='log', tag='vmp1', type_filter='tap_get', limit=300)
+  instrumentation(action='log', tag_filter='vmp1', type_filter='tap_get', limit=300)
   <!-- v3.1.0: migrated from get_instrumentation_log -->
   → 看 hot_keys / hot_methods / hot_functions 三个摘要
 
@@ -274,15 +274,14 @@ MCP 操作：
     mode="ast",
     tag="vmp1",
     rewrite_member_access=True,
-    rewrite_calls=True,
-    csp_bypass=True
+    rewrite_calls=True
   )
   <!-- v3.1.0: migrated from instrument_jsvmp_source -->
 
   模式选择：
-    - mode="ast"（默认推荐）：MCP 侧 esprima 解析，99% 覆盖率，挑战页可用
-    - mode="regex"：纯正则改写，80% 覆盖率，无 CDN 依赖，大文件安全
-    - AST 失败时自动 fallback 到 regex（fallback_on_error=True）
+    - mode="ast"（默认推荐）：MCP 侧 esprima 解析，挑战页可用
+    - mode="regex"：轻量正则改写，只覆盖 bracket member access
+    - 原始源码 AST parse 失败时自动 fallback 到 regex（fallback_on_error=True）
 ```
 
 #### 步骤 10：让插桩先于 VMP 生效
@@ -297,26 +296,43 @@ MCP 操作：
   ⚠️ 签名型反爬：不要清 cookie！第一次挑战拿到的 cookie 要留下
 ```
 
+#### 步骤 10.5：验证改写产物实际执行
+
+```
+MCP 操作：
+  instrumentation(action='status')
+  evaluate_js(expression="(() => ({
+    tapInstalled: window.__mcp_tap_installed === true,
+    logReady: Array.isArray(window.__mcp_vmp_log)
+  }))()")
+
+判定：
+  - files_rewritten > 0 且 tapInstalled=false
+    → 改写文本已下发，但浏览器未执行；优先怀疑嵌套 AST 节点改写损坏
+  - tapInstalled=true 且日志为空
+    → runtime 已执行；继续检查触发动作和 tag_filter
+```
+
 #### 步骤 11：读取插桩日志（指纹学习的金矿）
 
 ```
 MCP 操作：
 
   # 读取属性访问 hot_keys
-  instrumentation(action='log', tag='vmp1', type_filter='tap_get', limit=200)
+  instrumentation(action='log', tag_filter='vmp1', type_filter='tap_get', limit=200)
   <!-- v3.1.0: migrated from get_instrumentation_log -->
   → summary.hot_keys 告诉你 VMP 读取了哪些属性，按频次倒排
   → 典型 RS 输出：{"userAgent":120, "plugins":98, "webdriver":77, "cookie":43, ...}
   → 这就是 VMP 参与签名哈希的完整环境指纹集
 
   # 读取方法调用 hot_methods
-  instrumentation(action='log', tag='vmp1', type_filter='tap_method', limit=200)
+  instrumentation(action='log', tag_filter='vmp1', type_filter='tap_method', limit=200)
   <!-- v3.1.0: migrated from get_instrumentation_log -->
   → summary.hot_methods 格式 ObjectType.methodName
   → 能否看到 MD5/AES/HMAC 就是算法是否用标准加密的核心判据
 
   # 读取函数调用 hot_functions
-  instrumentation(action='log', tag='vmp1', type_filter='tap_call', limit=200)
+  instrumentation(action='log', tag_filter='vmp1', type_filter='tap_call', limit=200)
   <!-- v3.1.0: migrated from get_instrumentation_log -->
   → 看有没有 btoa/atob/encodeURIComponent 等熟识函数
 ```
@@ -338,7 +354,8 @@ MCP 操作：
 
 | 失败表现 | 可能原因 | 应对 |
 |----------|----------|------|
-| `instrumentation(action='log')` 返回空 | CSP 阻断 / url_pattern 未匹配 | 检查 CSP；确认 url_pattern 匹配到目标脚本 |
+| `files_rewritten > 0` 但 `__mcp_tap_installed=false` | 改写产物未解析/未执行，常见于嵌套 call/member/new 链 | 停止 AST route，按 regex → transparent 降级 |
+| runtime 已安装但 `instrumentation(action='log')` 返回空 | VMP 未触发 / tag_filter 不匹配 | 重新触发业务动作并检查 tag_filter |
 | `hot_keys` 只有 < 5 个属性 | regex 模式覆盖率不足 | 切换 mode="ast" 或增大 context_chars |
 | 签名值始终不一致 | 环境指纹参与哈希但未补齐 | 根据 hot_keys 逐项补齐环境 |
 | `navigate` 反复 412 | 观察者效应——Hook 破坏了签名 | 移除所有 pre_inject_hooks，改用源码级插桩 |
@@ -348,7 +365,7 @@ MCP 操作：
 
 ```
 L1: instrumentation(action='install', mode="ast")
-  → 失败
+  → status + runtime 标记健康检查失败
 L2: instrumentation(action='install', mode="regex")
   → 覆盖率不足
 L3: hook_jsvmp_interpreter(mode="transparent")
@@ -363,7 +380,7 @@ L6: 向用户说明情况，建议浏览器自动化或 sdenv
 **关键规则**：
 - L1→L2→L3 是标准降级路径，每级必须尝试
 - L3→L4 仅对行为型反爬开放，签名型必须走 L3→L5
-- 到达 L6 前必须在 Session 档案中记录完整降级路径
+- 到达 L6 前必须在当前 case 记录完整降级路径
 - **禁止从 L1 直接跳到 L6**
 
 ---
@@ -404,11 +421,11 @@ L6: 向用户说明情况，建议浏览器自动化或 sdenv
 2. **先 Hook 出口确定"要什么"，再 Hook 入口确定"给了什么"** — 出口驱动分析
 3. **`hook_function(path, mode='trace', ...)` 对高频调用函数日志量可能爆炸** <!-- v3.1.0: migrated from trace_function --> — 必须设置 `max_captures` 限制
 4. **`get_trace_data` 返回的海量数据需要本地过滤** — 用反向追踪法效率最高
-5. **`instrumentation(action='install', mode="regex")` 对带模板字符串、正则字面量的代码可能误改写** <!-- v3.1.0: migrated from instrument_jsvmp_source --> — AST 模式更可靠
+5. **`instrumentation(action='install', mode="regex")` 对带模板字符串、正则字面量的代码可能误改写** <!-- v3.1.0: migrated from instrument_jsvmp_source --> — AST 具备语法感知，但仍必须验证改写产物已执行
 6. **前三板斧对签名型反爬不可用** — Hook `Function.prototype.apply` 会改变 toString 原生性；Proxy 在 navigator 上会被检测
 7. **`dump_jsvmp_strings` 前提是字符串未被动态解密** — 看到 `decoded_strings` 全是单字母乱码就是加密的
 8. **`search_code(keyword='while')` 在超大文件（380KB+）会返回大量无关结果** — 应使用 `search_code(keyword, script_url=url)` <!-- v3.1.0: migrated from search_code_in_script --> 配合更精确关键词
-9. **源码级插桩的两种模式都默认 `cache_rewritten=True`** — 避免重复改写
+9. **源码级插桩会在 MCP 内部按 URL 缓存改写结果** — 当前统一接口不需要传缓存参数
 
 ---
 

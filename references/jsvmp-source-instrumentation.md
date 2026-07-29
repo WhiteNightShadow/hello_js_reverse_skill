@@ -1,6 +1,6 @@
 # JSVMP 源码级插桩专项指南（第四板斧）
 
-> **v2.5.0 新增文档**。本指南讲解 camoufox-reverse MCP v0.4.0+ 提供的源码级插桩能力（`instrument_jsvmp_source` / `get_instrumentation_log` / `find_dispatch_loops`）的使用方法论，是 JSVMP 四板斧中"第四板斧"的完整说明。
+> **v2.5.0 新增文档，v3.4.1 更新健康诊断**。当前执行接口以 camoufox-reverse MCP v1.1.1 的 `instrumentation(action=...)` 为准；文中的旧工具名只用于解释能力来源。
 >
 > 与 `jsvmp-analysis.md` 的第一/二/三板斧互补——前三板斧诊断"VM 看外界 / 外界看 VM"，本文档讲解"VM 看自己"。
 
@@ -69,40 +69,38 @@ __mcp_tap_call(fn, null, [args[0], args[1], ...], 'vmp1');
 
 `instrument_jsvmp_source(mode=...)` 支持两种模式：
 
-### 2.1 `mode="regex"`（默认，零依赖）
+### 2.1 `mode="regex"`（轻量兜底，零依赖）
 
 - **原理**：纯正则匹配 `<identifier>[<expr>]`，替换为 `__mcp_tap_get(identifier, expr, tag)`
 - **优点**：无外部 CDN 依赖，页面离线也能用；速度极快；大文件安全（10MB+ VMP 也能秒级改写）
 - **覆盖率**：~80% 的 member access；**不覆盖函数调用 tap**（只改写 `obj[key]`，不改写 `fn(args)`）
 - **局限**：对带模板字符串、正则字面量、嵌套方括号的代码可能误改写；只改 member access，不改 call
 - **使用场景**：
-  - 目标环境无法访问 cdnjs.cloudflare.com
   - 极限大文件（AST 模式内存超限）
   - 快速扫一遍看看 hot_keys 分布
 
-### 2.2 `mode="ast"`（高保真，需 CDN）
+### 2.2 `mode="ast"`（默认，MCP 侧 esprima）
 
-- **原理**：在页面内加载 Acorn（`cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js`）解析源码为 AST，精确识别 `MemberExpression` / `CallExpression`，只对应该改写的节点插入 tap
-- **优点**：99% 覆盖率，**同时改写 member access 和 call**；不会误改写字符串字面量/正则
-- **依赖**：页面必须能访问 cdnjs CDN
+- **原理**：在 MCP 进程中用 esprima-python 解析源码为 AST，识别 `MemberExpression` / `CallExpression` 后插入 tap
+- **优点**：同时改写 member access 和 call；不会把字符串字面量或正则内容当作代码节点
+- **依赖**：不依赖页面 CDN；esprima 仅覆盖其支持的 JavaScript 语法版本
 - **使用场景**：
-  - 绝大多数联网场景（默认推荐）
+  - 绝大多数场景（默认推荐）
   - 需要 `hot_methods` / `hot_functions` 数据（只有 AST 模式会生成）
-- **失败回退**：AST 解析失败时（例如脚本有语法错误或 Acorn 版本不支持的语法），`instrument_jsvmp_source` 会自动 pass-through 源码不变，并在 console 记 warn
+- **失败回退**：原始源码解析失败时可自动回落 regex；`last_mode_used="ast"` 不代表改写产物已经在浏览器成功执行
 
 > **v0.5.0 变化**：`mode="ast"` 的实现从 v0.4.x 的"页面内加载 acorn CDN"改为
 > **MCP 侧 esprima-python 解析**。这意味着：
 > - 挑战页（RS 412、Akamai sensor_data 挑战等）上 AST 模式**能用了**（旧实现因 CDN 被挑战拦住会静默失败）
-> - 零 JS 依赖，`instrument_jsvmp_source` 的 AST 模式现在**应成为默认选择**
+> - 零 JS 依赖，`instrumentation(action="install")` 的 AST 模式现在**应成为默认选择**
 > - 新增 `fallback_on_error=True`，esprima 解析失败时自动回落 regex
-> - 旧的 "ast_page" 模式保留但标注为 deprecated，仅做 A/B 对比用
 
 ### 2.3 选择建议
 
 | 情况 | 选 | 原因 |
 |------|-----|-----|
-| 首次分析某个 VMP，联网环境 | **AST** | `hot_methods` + `hot_functions` 能 30 秒内画出 VMP 行为画像 |
-| 离线/受限网络 | regex | 零依赖 |
+| 首次分析某个 VMP | **AST** | `hot_methods` + `hot_functions` 能快速画出 VMP 行为画像 |
+| 只需快速观察 bracket member access | regex | 改写轻、无需 AST |
 | VMP 文件 > 5 MB | regex | AST 改写内存开销大 |
 | 关心 VMP 调了哪些方法 | **AST** | regex 不生成 tap_method / tap_call |
 | 关心 VMP 读了哪些属性 | 任一 | 两种模式都生成 tap_get |
@@ -111,14 +109,14 @@ __mcp_tap_call(fn, null, [args[0], args[1], ...], 'vmp1');
 
 ## AST 模式健康诊断（v2.6.0 新增）
 
-启用 `instrument_jsvmp_source(mode="ast")` 后，通过 `get_instrumentation_status()` 的 `active_patterns[i].last_mode_used` 字段判断实际走了哪条路径：
+启用 `instrumentation(action="install", mode="ast")` 后，先通过
+`instrumentation(action="status")` 的 `active_patterns[i].last_mode_used` 判断改写路径：
 
 | `last_mode_used` | 含义 | 动作 |
 |---|---|---|
-| `"ast"` | MCP 侧 esprima 成功，全量 AST 改写 | 正常，继续 |
+| `"ast"` | 原始源码解析成功并完成 AST 改写 | 继续做运行时健康检查 |
 | `"regex"` | 你显式指定了 `mode="regex"` | 正常，继续 |
 | `"regex (fallback)"` | `mode="ast"` 但 esprima 解析失败，自动回落 regex | **警告**：看下文 |
-| `"ast_page"` | 走的是 deprecated 的页面内 Acorn 实现 | 迁到 `"ast"`，除非你在做 A/B |
 
 `"regex (fallback)"` 持续出现时：
 
@@ -127,6 +125,26 @@ __mcp_tap_call(fn, null, [args[0], args[1], ...], 'vmp1');
 3. 如果是 `SyntaxError: Unexpected token` 开头 → 可能 JS 被加了 BOM 或非标准前缀，可以本地用 `curl` 下来手动检查首 100 字节
 
 一般来说，RS sdenv*.js / Akamai acmescripts*.js / webmssdk 都能被 esprima 解析。如果出现持续 fallback，报告给 MCP 仓库 issue 区。
+
+### 改写产物运行时健康检查
+
+`files_rewritten > 0` 和 `last_mode_used="ast"` 只证明 MCP 生成并下发了改写文本，
+不能证明浏览器成功解析和执行了它。每次 reload 后继续检查：
+
+```text
+instrumentation(action="status")
+evaluate_js(expression="(() => ({
+  tapInstalled: window.__mcp_tap_installed === true,
+  logReady: Array.isArray(window.__mcp_vmp_log)
+}))()")
+instrumentation(action="log", tag_filter="vmp1", limit=10)
+```
+
+判定：
+
+- `files_rewritten > 0` 且 `tapInstalled=false`：优先怀疑改写产物语法损坏或执行前异常。常见触发结构是嵌套 `CallExpression` / `MemberExpression` / `NewExpression`，不是原始源码 parse 失败。
+- `tapInstalled=true` 但日志为空：runtime 已执行，继续检查 VMP 是否触发、tag/filter 是否正确，不要把空日志直接归因于语法错误。
+- 确认改写产物失败后，先停止原 AST route，再按 `ast → regex → transparent` 梯度重装；不要通过持续增大 `max_rewrites` 反复下发同一份失败产物。
 
 ---
 
@@ -179,8 +197,7 @@ Actions:
     tag="vmp1",                         # 一次插桩多 VMP 时区分
     rewrite_member_access=True,
     rewrite_calls=True,
-    max_rewrites=5000,
-    cache_rewritten=True                # 避免重复改写
+    max_rewrites=5000
   )
   → 返回：{"status": "instrumenting", "pattern": "...", "mode": "ast", "tag": "vmp1"}
 ```
@@ -355,7 +372,7 @@ get_runtime_probe_log(type_filter="canvas_toDataURL", limit=50)
 
 ### Q2：AST 模式报 `parse_error`
 
-**可能原因**：脚本有 Acorn 不支持的语法（如极老的 ES3 hack 或极新的 stage-0 提案）。
+**可能原因**：原始脚本包含 esprima-python 不支持的语法。
 
 **对策**：
 - 降级为 `mode="regex"`（零依赖，不会 parse）
@@ -364,15 +381,16 @@ get_runtime_probe_log(type_filter="canvas_toDataURL", limit=50)
 ### Q3：改写后页面崩溃
 
 **可能原因**：
-1. VMP 自己对自己的源码做了完整性校验（少见，但存在）——对策：用 regex 模式做轻改写，只改 member access
-2. Tag 变量名冲突——改个 `tag` 再试
-3. 改写后代码超过 JS 引擎 token 上限——把 `max_rewrites` 调小
+1. `files_rewritten > 0` 但 runtime 标记不存在——AST 改写产物可能因嵌套节点区间冲突而无法解析；停止 AST route 后降级 regex/transparent
+2. VMP 自己对源码做完整性校验——用 regex 模式做轻改写，只改 member access
+3. Tag 变量名冲突——改个 `tag` 再试
+4. 改写后代码过大——把 `max_rewrites` 调小
 
 ### Q4：hot_keys 没出现预期的环境指纹
 
 **可能原因**：
 1. VMP 还没真正执行——加大 `wait_until="networkidle"`，或 `wait_for` 某个元素后再读日志
-2. 改写没成功——先 `get_instrumentation_status` 看 `files_rewritten` 是否 > 0
+2. 改写或执行没成功——先看 `files_rewritten`，再检查 `window.__mcp_tap_installed`
 3. tag 搞混了——检查 `tag_filter` 是否写对
 
 ### Q5：日志爆炸到上限 20000 条
@@ -403,4 +421,4 @@ get_runtime_probe_log(type_filter="canvas_toDataURL", limit=50)
 - `references/jsdom-env-patches.md`：环境伪装补丁库（路径 B）
 - `references/mcp-cookbook.md` 场景 6：源码级插桩场景化操作
 - `cases/universal-vmp-source-instrumentation.md`：骨架案例模板
-- MCP 上游：https://github.com/WhiteNightShadow/camoufox-reverse-mcp（v0.4.0+）
+- MCP 上游：https://github.com/WhiteNightShadow/camoufox-reverse-mcp（当前基线 v1.1.1）

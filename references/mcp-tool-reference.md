@@ -1,14 +1,16 @@
-# MCP 工具分类索引 + v0.9.0 迁移指南
+# MCP v1.1.1 工具索引 + v0.9.0 迁移历史
 
-> **说明**：SKILL.md 核心层有工具分类索引，这里是详细版 + MCP v0.9.0 的迁移映射
+> **说明**：当前可调用工具以 SKILL.md 核心层和 MCP 工具自身 docstring 为准；本文后半部分保留 v0.8.x → v0.9.0 的历史迁移映射。
 >
-> **版本**：v3.1.0（MCP v0.9.0 工具名迁移）
+> **版本**：v3.4.1（MCP v1.1.1）
 >
-> **当前 MCP 版本**：camoufox-reverse MCP v0.9.0（~50 个工具，从 v0.8.x 的 ~80 个合并而来）
+> **当前 MCP 版本**：camoufox-reverse MCP v1.1.1（35 个工具）。v1.1.0 固定 `mcp>=1.29,<2` 并仅归一化安全的顶层可选参数 schema；v1.1.1 修复链式调用的重叠 AST 改写，并在插桩状态中暴露实际执行模式。
 
 ---
 
-## 一、工具分类表
+## 一、v0.9.0 历史工具分类表
+
+> 本节用于理解旧文档和迁移来源，包含后续已移除的 Session/Assertion 工具，不应作为当前工具清单。当前清单见 SKILL.md「核心武器」。
 
 ### Browser — 浏览器与页面控制
 
@@ -85,7 +87,7 @@
 | `dump_jsvmp_strings` | 提取 JSVMP 脚本中的字符串 |
 | `compare_env` | 采集浏览器环境指纹基准 |
 | `instrumentation(action='install', url_pattern=..., mode=..., tag=...)` <!-- v3.1.0: migrated from instrument_jsvmp_source --> | 源码级插桩（HTTP 层改写 VMP） |
-| `instrumentation(action='log', tag=..., type_filter=...)` <!-- v3.1.0: migrated from get_instrumentation_log --> | 获取源码插桩日志（hot_keys/hot_methods/hot_functions） |
+| `instrumentation(action='log', tag_filter=..., type_filter=...)` <!-- v3.1.0: migrated from get_instrumentation_log --> | 获取源码插桩日志（hot_keys/hot_methods/hot_functions） |
 | `instrumentation(action='status')` | 查看当前激活的源码插桩状态 |
 | `instrumentation(action='stop', url_pattern=...)` <!-- v3.1.0: migrated from stop_instrumentation --> | 停止源码级插桩 |
 | `instrumentation(action='reload')` <!-- v3.1.0: migrated from reload_with_hooks --> | 重载页面让 hooks 先于 VMP 生效 |
@@ -143,7 +145,7 @@
 | `search_code_in_script(url, keyword)` | `search_code(keyword, script_url=url)` | 合并到 search_code，script_url 可选参数 |
 | `trace_function(path, ...)` | `hook_function(path, mode='trace', ...)` | 追踪合并到 hook_function |
 | `instrument_jsvmp_source(url_pattern, ...)` | `instrumentation(action='install', url_pattern=url_pattern, ...)` | 源码插桩统一接口 |
-| `get_instrumentation_log(tag=X)` | `instrumentation(action='log', tag=X)` | |
+| `get_instrumentation_log(tag=X)` | `instrumentation(action='log', tag_filter=X)` | |
 | `get_instrumentation_status()` | `instrumentation(action='status')` | |
 | `stop_instrumentation()` | `instrumentation(action='stop')` | |
 | `reload_with_hooks()` | `instrumentation(action='reload')` | |

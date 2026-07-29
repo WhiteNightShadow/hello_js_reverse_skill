@@ -258,12 +258,13 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.0.0**: 反检测浏览器逆向分析（32 个核心工具，统一 API，含源码级插桩 + Cookie 归因分析）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.1.1**: 反检测浏览器逆向分析（35 个工具，统一 API，含源码级插桩、Cookie 归因和引擎层属性追踪）
 
 ## 版本记录
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.4.1 | 2026-07-29 | 增加 AST 源码插桩执行健康门禁；对齐 camoufox-reverse MCP v1.1.1；保持正常插桩流程不变，仅在异常时进入安全降级 |
 | v3.3.1 | 2026-04-21 | 经验法则精简：移除单站点经验（env-patch 行数阈值 / UA 矩阵 / cacheOpts 三件套），合并 evaluate_js 相关为 1 条，总数从 24 压缩到 22 条 |
 | v3.3.0 | 2026-04-19 | 核心层回归扩容：Phase 1-5 详细动作 + 10 个场景速查 + 经验法则回迁核心层；案例层强化（禁动清单 + UA 分支矩阵） |
 | v3.2.1 | 2026-04-19 | Phase 0.5.1 强化案例复用策略；经验法则第 11 条重写 |

@@ -90,7 +90,7 @@ MCP 操作：
   <!-- v3.1.0: migrated from instrument_jsvmp_source -->
   → 是唯一能打开黑箱的工具
 
-  instrumentation(action='log', tag='vmp1', type_filter='tap_get', limit=200)
+  instrumentation(action='log', tag_filter='vmp1', type_filter='tap_get', limit=200)
   <!-- v3.1.0: migrated from get_instrumentation_log -->
   → hot_keys 指纹学习法 30 秒就能告诉你 VMP 读了哪些环境属性
 ```
@@ -145,7 +145,7 @@ v0.5.0 把 AST 从页面内 Acorn 改为 MCP 侧 esprima，RS 412 挑战页也�
 
 > 原 #37
 
-严格的 CSP 会阻止改写代码执行。v0.6.0 新增 `csp_bypass=True` 参数自动绕过。
+严格的 CSP 可能阻止改写代码执行。当前统一接口没有 `csp_bypass` 参数；若运行时健康检查失败，应停止该插桩并降级到更保守的观测方式。
 
 ### 规则 15：`navigate` 的 `collect_response_chain` 默认开启
 
