@@ -688,6 +688,10 @@ Actions:
 - 命中是强正证据；未命中不是“未访问”的证明。必须检查
   `coverage.negative_result_is_conclusive=false`。
 - `possibly_capped=true` 或 `input_truncated=true` 时结果可能不完整。
+- `action="status"` 中 `ack_supported=true` 只表示浏览器支持确认协议；只有
+  `acknowledged=true` 才表示当前所有 live native 进程已实际确认。
+- `query_trace_file` 的 `possibly_capped=null`、`cap_known=false` 表示历史文件
+  没有保存原始事件上限，必须按“未知”处理，不能当成未触发 cap。
 - 它不改写页面 JS 对象、descriptor 或 prototype；高频记录仍可能产生 timing
   side channel，不能描述为“完全不可检测”。
 - trace 用于确定优先调查对象；不能据此直接认定“只需补这些属性”。
