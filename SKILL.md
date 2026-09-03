@@ -693,6 +693,8 @@ Actions:
   `acknowledged=true` 才表示当前所有 live native 进程已实际确认。
 - `query_trace_file` 的 `possibly_capped=null`、`cap_known=false` 表示历史文件
   没有保存原始事件上限，必须按“未知”处理，不能当成未触发 cap。
+- 历史文件也没有浏览器 capability marker；`coverage.hook_count=null`、
+  `hook_count_known=false` 必须按未知处理，不能套用当前 reverse.5 的 77 点。
 - 它不改写页面 JS 对象、descriptor 或 prototype；高频记录仍可能产生 timing
   side channel，不能描述为“完全不可检测”。
 - trace 用于确定优先调查对象；不能据此直接认定“只需补这些属性”。
