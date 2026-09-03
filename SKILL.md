@@ -13,7 +13,7 @@ description: >
   v3.3.0 核心层回归扩容：Phase 1-5 详细动作 + 10 个场景速查 + 经验法则回迁核心层。
   v3.3.1 经验法则精简至 22 条：移除单站点经验，合并 evaluate_js 规则。
   v3.4.1 增加 AST 源码插桩执行健康门禁，区分原始源码解析失败与改写产物执行失败。
-  v3.5.0 对齐 MCP v1.4.0 / Camoufox Reverse reverse.4：安全默认启动、交互式原生追踪、覆盖边界与并存安装。
+  v3.5.1 对齐 MCP v1.4.1 / Camoufox Reverse reverse.5：安全默认启动、交互式原生追踪、覆盖边界与并存安装。
 ---
 
 # ⚠️ 硬约束 Checklist（分析启动前必做，不可跳过）
@@ -643,7 +643,7 @@ Actions:
 
 #### 3.0 环境指纹采集（路径 B 核心突破点）
 
-> v3.5.0 对齐 MCP v1.4.0 与 Camoufox Reverse reverse.4。默认分析路径不启用
+> v3.5.1 对齐 MCP v1.4.1 与 Camoufox Reverse reverse.5。默认分析路径不启用
 > 原生追踪；仅在路径 B 确实需要时显式选择定制版。
 
 ```
@@ -683,8 +683,9 @@ Actions:
 
 **证据边界（不可省略）**：
 
-- PropertyTracer 是由 **75 个显式注入点**组成的 Gecko 原生 DOM/Web API
-  覆盖集，不是任意 SpiderMonkey 属性、JS 对象、VM PC/opcode 或字节码追踪器。
+- PropertyTracer 是由当前浏览器声明的**固定原生注入点**组成的 Gecko DOM/Web
+  API 覆盖集（reverse.5 为 77 点，旧兼容构建为 75 点），不是任意
+  SpiderMonkey 属性、JS 对象、VM PC/opcode 或字节码追踪器。
 - 命中是强正证据；未命中不是“未访问”的证明。必须检查
   `coverage.negative_result_is_conclusive=false`。
 - `possibly_capped=true` 或 `input_truncated=true` 时结果可能不完整。
@@ -700,7 +701,7 @@ Actions:
   AudioContext 等敏感或有副作用的路径进入 `values_skipped`。
 
 **并存安装规则**：使用 Camoufox Python 0.5+ 和 release 附带的 installer +
-SHA-256，将 reverse.4 安装到 `browsers/whitenightshadow/...`；官方 active 必须与
+SHA-256，将 reverse.5 安装到 `browsers/whitenightshadow/...`；官方 active 必须与
 reverse build 的完整 version/build 一致。通过 `browser_version` 只为一次 MCP
 launch 选择定制版。不得覆盖/清空缓存、改变持久化 active 或自动迁移 0.4 用户。
 
@@ -1372,6 +1373,7 @@ verify_signer_offline(
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.5.1 | 2026-09-03 | 对齐 MCP v1.4.1 / reverse.5：LocalStorage 迁移到 Firefox 152 LSNG，并覆盖可达的 partitioned 分支；固定覆盖集增至 77 点，protocol 1 不变 |
 | v3.5.0 | 2026-09-03 | 对齐 MCP v1.4.0 / reverse.4：普通任务默认不启用 trace；新增 start→操作→stop 交互窗口、75 点覆盖边界、负证据限制、安全 snapshot 语义与 side-by-side 安装规则 |
 | v3.4.1 | 2026-07-29 | 增加 AST 插桩执行健康门禁：`files_rewritten` 只表示完成改写，必须继续验证 runtime 标记；失败时按通用梯度降级，不引入站点特例 |
 | v3.4.0 | 2026-04-22 | Phase 3 新增原生追踪分支（trace_property_access）。依赖 camoufox-reverse 定制版浏览器 + MCP v1.1.0；未安装时继续使用 compare_env |

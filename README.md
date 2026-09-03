@@ -207,7 +207,7 @@ python main.py
 | `intercept_request` | 拦截/修改/Mock 网络请求 |
 | `cookies(action='get'\|'set'\|'delete')` | Cookie 管理 |
 | `compare_env` | 采集固定 JS 环境基线；其他属性需通过 `properties` 或分批 `evaluate_js` 扩展 |
-| `trace_property_access(action=...)` | reverse.4 的 75 点 Gecko 原生追踪；支持 start→操作→stop、kind/site 过滤和覆盖边界 |
+| `trace_property_access(action=...)` | reverse.5 的 77 点 Gecko 原生追踪（旧兼容构建为 75 点）；支持 start→操作→stop、kind/site 过滤和覆盖边界 |
 | `verify_signer_offline` | 用真实样本离线验证签名代码 |
 | `evaluate_js` | 在页面执行任意 JS |
 | `export_state` / `import_state` | 保存/恢复浏览器状态 |
@@ -259,12 +259,13 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.4.0**: 反检测浏览器逆向分析（统一 API，含源码级插桩、Cookie 归因与可选 Gecko 原生属性追踪）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.4.1**: 反检测浏览器逆向分析（统一 API，含源码级插桩、Cookie 归因与可选 Gecko 原生属性追踪）
 
 ## 版本记录
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.5.1 | 2026-09-03 | 对齐 MCP v1.4.1 / Camoufox Reverse reverse.5；LocalStorage 覆盖迁移至 Firefox 152 LSNG，并纳入可达的 partitioned 分支，protocol 1 不变 |
 | v3.5.0 | 2026-09-03 | 对齐 MCP v1.4.0 / Camoufox Reverse reverse.4；默认保留 sandbox，新增交互式原生追踪、75 点证据边界、安全 snapshot 与 side-by-side 安装规则 |
 | v3.4.1 | 2026-07-29 | 增加 AST 源码插桩执行健康门禁；对齐 camoufox-reverse MCP v1.1.1；保持正常插桩流程不变，仅在异常时进入安全降级 |
 | v3.3.1 | 2026-04-21 | 经验法则精简：移除单站点经验（env-patch 行数阈值 / UA 矩阵 / cacheOpts 三件套），合并 evaluate_js 相关为 1 条，总数从 24 压缩到 22 条 |

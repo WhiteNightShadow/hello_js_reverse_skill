@@ -613,7 +613,7 @@ status = await instrumentation(action='status')
 | JS 执行 | `evaluate_js` `evaluate_js_handle` `add_init_script` | 代码执行（支持持久化） |
 | 调试 | `set_breakpoint_via_hook` `get_breakpoint_data` `get_console_logs` | 伪断点调试（支持持久化） |
 | Hook | `hook_function(..., mode='trace', ...)` `get_trace_data` `hook_function` `inject_hook_preset` `remove_hooks` `hook_function(..., mode='intercept', ...)` | 函数 Hook（支持持久化 + 防覆盖） | <!-- v3.1.0: migrated from trace_function, freeze_prototype -->
-| 属性追踪 | `hook_jsvmp_interpreter(mode='proxy', track_props=True, proxy_objects=[...])` + `evaluate_js("window.__mcp_jsvmp_log || []")` | JS Proxy 监控，可检测；原生 75 点另用 `trace_property_access` |
+| 属性追踪 | `hook_jsvmp_interpreter(mode='proxy', track_props=True, proxy_objects=[...])` + `evaluate_js("window.__mcp_jsvmp_log || []")` | JS Proxy 监控，可检测；原生固定点覆盖另用 `trace_property_access` |
 | JSVMP 专项 | `hook_jsvmp_interpreter` `evaluate_js("window.__mcp_jsvmp_log || []")` `compare_env` | JSVMP 虚拟机保护分析 |
 | 网络 | `network_capture(action='start', ...)` `network_capture(action='stop')` `list_network_requests` `get_network_request` `get_request_initiator` `intercept_request` `stop_intercept` | 网络分析（支持响应体捕获） | <!-- v3.1.0: migrated from start_network_capture, stop_network_capture -->
 | 存储 | `cookies(action='get', ...)` `cookies(action='set', ...)` `delete_cookies` `get_storage` `set_storage` `export_state` `import_state` | 状态管理 | <!-- v3.1.0: migrated from get_cookies, set_cookies -->

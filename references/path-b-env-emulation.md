@@ -4,7 +4,7 @@
 >
 > **前置要求**：已完成反爬类型三分法识别 + 路径选择决策树（见 SKILL.md）
 >
-> **版本**：v3.5.0（MCP v1.4.0；原生 75 点追踪为可选正证据）
+> **版本**：v3.5.1（MCP v1.4.1；原生固定点追踪为可选正证据）
 
 ---
 
@@ -76,9 +76,9 @@ compare_env()
   `properties` 或分批 `evaluate_js` 扩展
 ```
 
-如 `check_environment()` 返回兼容的 reverse.4 selector，可按 SKILL.md Phase 3
+如 `check_environment()` 返回兼容的 reverse.5 selector，可按 SKILL.md Phase 3
 另启定制版并执行 `trace_property_access(action="start")` → 目标行为 →
-`action="stop"`。它只覆盖 75 个 Gecko 原生注入点：命中可提高补丁优先级，未命中
+`action="stop"`。它只覆盖当前构建声明的固定 Gecko 原生点（reverse.5 为 77 点）：命中可提高补丁优先级，未命中
 不能排除属性使用，仍需 `compare_env` 与分批 `evaluate_js` 补全证据。
 
 ### 分批采集细粒度环境值（4-5 批次）

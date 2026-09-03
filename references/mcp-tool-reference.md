@@ -1,16 +1,16 @@
-# MCP v1.4.0 工具索引 + v0.9.0 迁移历史
+# MCP v1.4.1 工具索引 + v0.9.0 迁移历史
 
 > **说明**：当前可调用工具以 SKILL.md 核心层和 MCP 工具自身 docstring 为准；本文后半部分保留 v0.8.x → v0.9.0 的历史迁移映射。
 >
-> **版本**：v3.5.0（MCP v1.4.0）
+> **版本**：v3.5.1（MCP v1.4.1）
 >
-> **当前 MCP 版本**：camoufox-reverse MCP v1.4.0。当前可调用参数以工具 docstring 为准；不要从历史表推断现行工具。
+> **当前 MCP 版本**：camoufox-reverse MCP v1.4.1。当前可调用参数以工具 docstring 为准；不要从历史表推断现行工具。
 
 ### 当前原生 PropertyTracer（v1.1+，v1.4 增强）
 
-`trace_property_access` 是独立的 Gecko 原生 75 点覆盖工具，支持
+`trace_property_access` 是独立的 Gecko 原生固定点覆盖工具，支持
 `action=capture|start|stop|query|clear|status`。它不等同于 Proxy，也不是任意
-JavaScript 属性追踪；命中是强正证据，未命中不是否定证据。reverse.4 可返回
+JavaScript 属性追踪；命中是强正证据，未命中不是否定证据。reverse.5 可返回
 get/set/call、native site、进程序列和全局时间扩展字段。
 
 ---
