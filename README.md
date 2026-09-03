@@ -206,7 +206,7 @@ python main.py
 | `get_request_initiator` | 获取发起请求的 JS 调用栈（黄金路径） |
 | `intercept_request` | 拦截/修改/Mock 网络请求 |
 | `cookies(action='get'\|'set'\|'delete')` | Cookie 管理 |
-| `compare_env` | 全面收集浏览器环境，用于补环境对照 |
+| `compare_env` | 采集固定 JS 环境基线；其他属性需通过 `properties` 或分批 `evaluate_js` 扩展 |
 | `trace_property_access(action=...)` | reverse.4 的 75 点 Gecko 原生追踪；支持 start→操作→stop、kind/site 过滤和覆盖边界 |
 | `verify_signer_offline` | 用真实样本离线验证签名代码 |
 | `evaluate_js` | 在页面执行任意 JS |

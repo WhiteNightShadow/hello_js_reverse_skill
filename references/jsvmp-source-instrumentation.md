@@ -421,4 +421,4 @@ get_runtime_probe_log(type_filter="canvas_toDataURL", limit=50)
 - `references/jsdom-env-patches.md`：环境伪装补丁库（路径 B）
 - `references/mcp-cookbook.md` 场景 6：源码级插桩场景化操作
 - `cases/universal-vmp-source-instrumentation.md`：骨架案例模板
-- MCP 上游：https://github.com/WhiteNightShadow/camoufox-reverse-mcp（当前基线 v1.1.1）
+- MCP 上游：https://github.com/WhiteNightShadow/camoufox-reverse-mcp（当前基线 v1.4.0）

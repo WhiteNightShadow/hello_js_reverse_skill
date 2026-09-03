@@ -37,7 +37,7 @@
 | **JSVMP 插桩** | `hook_jsvmp_interpreter` | 一键插桩 JSVMP（Function.prototype.apply + 30+ 敏感属性） |
 | **JSVMP 日志** | `evaluate_js("window.__mcp_jsvmp_log || []")` | 读取 JSVMP 探针日志 |
 | **JSVMP 字符串** | `dump_jsvmp_strings` | 提取字符串数组，识别 API 名称，检测混淆模式 |
-| **环境采集** | `compare_env` | 全面收集浏览器环境（navigator/screen/canvas/WebGL/Audio/timing） |
+| **环境采集** | `compare_env` | 采集固定 JS 环境基线；其他属性用 `properties` 或分批 `evaluate_js` 扩展 |
 | **网络捕获** | `network_capture(action='start', ...)` / `network_capture(action='stop')` | 启停网络捕获（支持 `capture_body` 捕获响应体） | <!-- v3.1.0: migrated from start_network_capture / stop_network_capture -->
 | **网络请求** | `list_network_requests` | 列出捕获的请求 |
 | **请求详情** | `get_network_request` | 获取请求完整信息（含响应体） |
@@ -404,7 +404,7 @@
 [camoufox-reverse] dump_jsvmp_strings             → 提取字符串数组，识别 API 名称
   触发操作...
 [camoufox-reverse] evaluate_js("window.__mcp_jsvmp_log || []") → 获取 JSVMP 探针日志
-[camoufox-reverse] compare_env                    → 收集完整浏览器环境（补环境基准线）
+[camoufox-reverse] compare_env                    → 采集固定 JS 环境基线（其他属性需扩展）
 ```
 
 #### transparent 模式示例（v0.5.0，v2.6.0 吸收）

@@ -72,7 +72,8 @@ search_code(keyword="cacheOpts", script_url='<VMP脚本URL>')
 launch_browser({headless: false, os_type: "macos", locale: "zh-CN"})
 navigate({url: "目标页面", wait_until: "domcontentloaded"})
 compare_env()
-→ 采集主流环境基准数据（navigator/screen/canvas/WebGL/Audio/timing）
+→ 采集固定 JS 环境基线（navigator/screen/timezone）；其他属性用
+  `properties` 或分批 `evaluate_js` 扩展
 ```
 
 如 `check_environment()` 返回兼容的 reverse.4 selector，可按 SKILL.md Phase 3

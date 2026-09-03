@@ -145,8 +145,8 @@ MCP 操作：
     · API 调用统计（哪些原生函数被 VM 调用）
     · 属性读取摘要（哪些环境属性被访问）
     · 调用时序（帮助定位签名生成节点）
-  - compare_env → 收集完整浏览器环境（navigator/screen/canvas/WebGL/Audio/timing）
-    · 用于后续 Node.js/Python 补环境时对照
+  - compare_env → 采集固定 JS 环境基线（navigator/screen/timezone）
+    · 其他属性用 `properties` 或分批 `evaluate_js` 扩展后再做补环境对照
 
 快速路径无法解决时，再进入手动三板斧流程 ↓
 ```
@@ -301,8 +301,8 @@ MCP 操作：
   - hook_jsvmp_interpreter(mode='proxy', track_props=True, proxy_objects=["疑似签名容器对象"])
     → Proxy 级别属性访问追踪，自动记录读写操作
   - evaluate_js("window.__mcp_jsvmp_log || []") → 获取 JS Proxy 属性访问记录
-  - compare_env → 收集完整浏览器环境信息
-    → 用于后续补环境时精确对照 Node.js/Python 差异
+  - compare_env → 采集固定 JS 环境基线
+    → 其他属性用 `properties` 或分批 `evaluate_js` 扩展，再对照 Node.js/Python 差异
 ```
 
 **方法 2：手动注入监控脚本**
