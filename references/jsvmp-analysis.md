@@ -91,12 +91,12 @@ MCP 操作（推荐顺序）：
   │  hook_function(mode='trace',     │   │  → summary.hot_keys             │ <!-- v3.1.0: migrated from trace_function -->
   │    分发函数/子函数)              │   │  → summary.hot_methods          │
   │  hook_jsvmp_interpreter          │   │  → summary.hot_functions        │
-  │    (mode='proxy', trackProps=True)│   └────────┬────────────────────────┘ <!-- v3.1.0: migrated from trace_property_access -->
+  │    (mode='proxy', track_props=True)│   └────────┬────────────────────────┘
                                           └────────┬────────────────────────┘
                                                    │
                             ↓                      ↓
                    ┌── 第三板斧 日志分析 ──────────────────┐
-                   │  get_trace_data + get_jsvmp_log       │
+                   │  instrumentation(log) + evaluate_js   │
                    │    + get_runtime_probe_log            │
                    │    + instrumentation(action='log')    │ <!-- v3.1.0: migrated from get_instrumentation_log -->
                    │  反向追踪法（从签名值→明文）            │
@@ -141,7 +141,7 @@ MCP 操作：
   - hook_jsvmp_interpreter → 自动 Hook Function.prototype.apply + 追踪 30+ 敏感属性读取
   - dump_jsvmp_strings → 提取字符串数组，识别 API 名称，检测混淆模式
   - 触发目标操作（翻页、提交等）
-  - get_jsvmp_log → 获取结构化分析结果：
+  - evaluate_js("window.__mcp_jsvmp_log || []") → 获取结构化探针结果：
     · API 调用统计（哪些原生函数被 VM 调用）
     · 属性读取摘要（哪些环境属性被访问）
     · 调用时序（帮助定位签名生成节点）
@@ -298,9 +298,9 @@ MCP 操作：
 
 ```
 MCP 操作：
-  - hook_jsvmp_interpreter(mode='proxy', trackProps=True, target_expression="疑似签名容器对象") <!-- v3.1.0: migrated from trace_property_access -->
+  - hook_jsvmp_interpreter(mode='proxy', track_props=True, proxy_objects=["疑似签名容器对象"])
     → Proxy 级别属性访问追踪，自动记录读写操作
-  - get_property_access_log → 获取属性访问记录
+  - evaluate_js("window.__mcp_jsvmp_log || []") → 获取 JS Proxy 属性访问记录
   - compare_env → 收集完整浏览器环境信息
     → 用于后续补环境时精确对照 Node.js/Python 差异
 ```
@@ -360,10 +360,10 @@ JSVMP 的 trace 日志通常有数百甚至数千条，需要系统化的分析�
 ```
 MCP 操作：
   - get_trace_data → 获取函数追踪数据（自动合并页面数据 + Python 端持久化数据）
-  - get_jsvmp_log → 获取 JSVMP 专项日志（含 API 调用统计 + 属性读取摘要）
+  - evaluate_js("window.__mcp_jsvmp_log || []") → 获取 JSVMP 专项日志
   - get_console_logs → 获取 Hook 输出
   - get_breakpoint_data → 获取伪断点捕获数据
-  - get_property_access_log → 获取属性访问记录
+  - evaluate_js("window.__mcp_jsvmp_log || []") → 获取 JS Proxy 属性访问记录
 ```
 
 #### 3.2 过滤策略
@@ -613,10 +613,10 @@ JSVMP 签名还原决策树：
 **第二板斧 — 插桩解释器**：
 - [ ] `hook_jsvmp_interpreter(script_url=<VMP basename>)` 多路径探针（apply/call/bind + Reflect.*/Proxy）
 - [ ] 分层 `hook_function(mode='trace')`（粗 → 中 → 细，用 `max_captures` 限制日志量） <!-- v3.1.0: migrated from trace_function -->
-- [ ] `hook_jsvmp_interpreter(mode='proxy', trackProps=True, targets=["navigator.*", "screen.*", ...])` 监控签名容器 <!-- v3.1.0: migrated from trace_property_access -->
+- [ ] `hook_jsvmp_interpreter(mode='proxy', track_props=True, proxy_objects=["navigator", "screen", ...])` 监控所选对象（JS 层，可检测）
 
 **第三板斧 — 日志分析**：
-- [ ] `get_jsvmp_log` + `get_trace_data` + `get_runtime_probe_log`（如果装了 runtime_probe）+ `get_console_logs`
+- [ ] `evaluate_js("window.__mcp_jsvmp_log || []")` + `instrumentation(action='log')` + `get_console_logs`
 - [ ] 反向追踪法，找到签名值首次出现的位置
 - [ ] 多次请求对比，确认变化因子和固定因子
 

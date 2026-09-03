@@ -1,10 +1,17 @@
-# MCP v1.1.1 工具索引 + v0.9.0 迁移历史
+# MCP v1.4.0 工具索引 + v0.9.0 迁移历史
 
 > **说明**：当前可调用工具以 SKILL.md 核心层和 MCP 工具自身 docstring 为准；本文后半部分保留 v0.8.x → v0.9.0 的历史迁移映射。
 >
-> **版本**：v3.4.1（MCP v1.1.1）
+> **版本**：v3.5.0（MCP v1.4.0）
 >
-> **当前 MCP 版本**：camoufox-reverse MCP v1.1.1（35 个工具）。v1.1.0 固定 `mcp>=1.29,<2` 并仅归一化安全的顶层可选参数 schema；v1.1.1 修复链式调用的重叠 AST 改写，并在插桩状态中暴露实际执行模式。
+> **当前 MCP 版本**：camoufox-reverse MCP v1.4.0。当前可调用参数以工具 docstring 为准；不要从历史表推断现行工具。
+
+### 当前原生 PropertyTracer（v1.1+，v1.4 增强）
+
+`trace_property_access` 是独立的 Gecko 原生 75 点覆盖工具，支持
+`action=capture|start|stop|query|clear|status`。它不等同于 Proxy，也不是任意
+JavaScript 属性追踪；命中是强正证据，未命中不是否定证据。reverse.4 可返回
+get/set/call、native site、进程序列和全局时间扩展字段。
 
 ---
 
@@ -82,7 +89,7 @@
 | 工具名（v0.9.0） | 一行描述 |
 |-------------------|---------|
 | `hook_jsvmp_interpreter` | 多路径通用探针（proxy/transparent 模式） |
-| `hook_jsvmp_interpreter(mode='proxy', trackProps=True)` <!-- v3.1.0: migrated from trace_property_access --> | Proxy 级别属性访问追踪 |
+| `hook_jsvmp_interpreter(mode='proxy', track_props=True, proxy_objects=[...])` | JS Proxy 级别属性访问追踪，可检测且有 observer effect |
 | `get_jsvmp_log` | 获取 JSVMP 探针日志 |
 | `dump_jsvmp_strings` | 提取 JSVMP 脚本中的字符串 |
 | `compare_env` | 采集浏览器环境指纹基准 |
@@ -156,7 +163,7 @@
 | `save_script(url, path)` | `scripts(action='save', url=url, save_path=path)` | |
 | `reverify_all_assertions_on_domain()` | `verify_assertion(assertion_id='*')` | 批量验证合并到 verify_assertion |
 | `find_dispatch_loops(url)` | `search_code(keyword='switch', script_url=url, context_chars=500)` | 合并到 search_code 的高级用法 |
-| `trace_property_access(...)` | `hook_jsvmp_interpreter(mode='proxy', trackProps=True)` | 合并到 hook_jsvmp_interpreter |
+| `trace_property_access(...)`（v0.8 的旧 JS 层同名工具） | `hook_jsvmp_interpreter(mode='proxy', track_props=True)` | 历史迁移；v1.1+ 同名工具是全新且独立的 Gecko native 工具 |
 | `freeze_prototype(class, method)` | `hook_function('class.prototype.method', mode='intercept', ...)` | 合并到 hook_function |
 | `get_page_content()` | `evaluate_js("document.documentElement.outerHTML")` | 用 evaluate_js 替代 |
 
@@ -164,10 +171,10 @@
 
 | 已删除工具 | 替代方案 |
 |-----------|---------|
-| `get_property_access_log` | `get_jsvmp_log(type_filter='prop_read')` |
+| `get_property_access_log` | `evaluate_js("window.__mcp_jsvmp_log || []")` |
 | `get_page_content` | `evaluate_js("document.documentElement.outerHTML")` <!-- v3.1.0: migrated from get_page_content --> |
 | `find_dispatch_loops` | `search_code(keyword='switch', script_url='<url>', context_chars=500)` |
-| `trace_property_access` | `hook_jsvmp_interpreter(mode='proxy', trackProps=True)` |
+| `trace_property_access`（v0.8 旧 JS 层工具） | `hook_jsvmp_interpreter(mode='proxy', track_props=True)`；不要与 v1.1+ 原生同名工具混淆 |
 | `freeze_prototype` | `hook_function('X.prototype.Y', mode='intercept', non_overridable=True)` |
 | `check_csp_policy` | `evaluate_js("document.querySelector('meta[http-equiv=Content-Security-Policy]')?.content")` |
 | `get_response_chain` | `navigate()` 返回值中的 `redirect_chain` 字段 |

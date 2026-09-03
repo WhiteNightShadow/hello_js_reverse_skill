@@ -33,9 +33,9 @@
 | **预设 Hook** | `inject_hook_preset` | 一键 Hook（xhr/fetch/crypto/websocket/debugger_bypass，默认持久化） |
 | **移除 Hook** | `remove_hooks` | 移除所有 Hook（支持 `keep_persistent` 保留持久化 Hook） |
 | **冻结原型** | `hook_function(..., mode='intercept', ...)` | 冻结任意原型方法，防止页面 JS 覆盖 Hook | <!-- v3.1.0: migrated from freeze_prototype -->
-| **属性追踪** | `hook_jsvmp_interpreter(mode='proxy', trackProps=True)` / `get_property_access_log` | Proxy 级别属性访问追踪 | <!-- v3.1.0: migrated from trace_property_access -->
+| **属性追踪（JS 层）** | `hook_jsvmp_interpreter(mode='proxy', track_props=True, proxy_objects=[...])` / `evaluate_js("window.__mcp_jsvmp_log || []")` | Proxy 级别追踪，可检测；与原生 `trace_property_access` 不同 |
 | **JSVMP 插桩** | `hook_jsvmp_interpreter` | 一键插桩 JSVMP（Function.prototype.apply + 30+ 敏感属性） |
-| **JSVMP 日志** | `get_jsvmp_log` | 获取 JSVMP 日志（API 调用统计 + 属性读取摘要） |
+| **JSVMP 日志** | `evaluate_js("window.__mcp_jsvmp_log || []")` | 读取 JSVMP 探针日志 |
 | **JSVMP 字符串** | `dump_jsvmp_strings` | 提取字符串数组，识别 API 名称，检测混淆模式 |
 | **环境采集** | `compare_env` | 全面收集浏览器环境（navigator/screen/canvas/WebGL/Audio/timing） |
 | **网络捕获** | `network_capture(action='start', ...)` / `network_capture(action='stop')` | 启停网络捕获（支持 `capture_body` 捕获响应体） | <!-- v3.1.0: migrated from start_network_capture / stop_network_capture -->
@@ -403,7 +403,7 @@
 [camoufox-reverse] hook_jsvmp_interpreter        → 一键插桩 Function.prototype.apply + 30+ 敏感属性
 [camoufox-reverse] dump_jsvmp_strings             → 提取字符串数组，识别 API 名称
   触发操作...
-[camoufox-reverse] get_jsvmp_log                  → 获取 API 调用统计 + 属性读取摘要
+[camoufox-reverse] evaluate_js("window.__mcp_jsvmp_log || []") → 获取 JSVMP 探针日志
 [camoufox-reverse] compare_env                    → 收集完整浏览器环境（补环境基准线）
 ```
 
@@ -434,9 +434,9 @@ await navigate(url, pre_inject_hooks=["jsvmp_probe_transparent"])
 ### 使用属性访问追踪
 
 ```
-[camoufox-reverse] hook_jsvmp_interpreter(mode='proxy', trackProps=True, target_expression="navigator") <!-- v3.1.0: migrated from trace_property_access -->
+[camoufox-reverse] hook_jsvmp_interpreter(mode='proxy', track_props=True, proxy_objects=["navigator"])
   触发操作...
-[camoufox-reverse] get_property_access_log        → 查看 navigator 的哪些属性被读取
+[camoufox-reverse] evaluate_js("window.__mcp_jsvmp_log || []") → 查看 JS Proxy 日志
 ```
 → 精确发现 JSVMP 或签名逻辑读取了哪些环境属性
 
@@ -613,8 +613,8 @@ status = await instrumentation(action='status')
 | JS 执行 | `evaluate_js` `evaluate_js_handle` `add_init_script` | 代码执行（支持持久化） |
 | 调试 | `set_breakpoint_via_hook` `get_breakpoint_data` `get_console_logs` | 伪断点调试（支持持久化） |
 | Hook | `hook_function(..., mode='trace', ...)` `get_trace_data` `hook_function` `inject_hook_preset` `remove_hooks` `hook_function(..., mode='intercept', ...)` | 函数 Hook（支持持久化 + 防覆盖） | <!-- v3.1.0: migrated from trace_function, freeze_prototype -->
-| 属性追踪 | `hook_jsvmp_interpreter(mode='proxy', trackProps=True)` `get_property_access_log` | Proxy 级别属性访问监控 | <!-- v3.1.0: migrated from trace_property_access -->
-| JSVMP 专项 | `hook_jsvmp_interpreter` `get_jsvmp_log` `dump_jsvmp_strings` `compare_env` | JSVMP 虚拟机保护分析 |
+| 属性追踪 | `hook_jsvmp_interpreter(mode='proxy', track_props=True, proxy_objects=[...])` + `evaluate_js("window.__mcp_jsvmp_log || []")` | JS Proxy 监控，可检测；原生 75 点另用 `trace_property_access` |
+| JSVMP 专项 | `hook_jsvmp_interpreter` `evaluate_js("window.__mcp_jsvmp_log || []")` `compare_env` | JSVMP 虚拟机保护分析 |
 | 网络 | `network_capture(action='start', ...)` `network_capture(action='stop')` `list_network_requests` `get_network_request` `get_request_initiator` `intercept_request` `stop_intercept` | 网络分析（支持响应体捕获） | <!-- v3.1.0: migrated from start_network_capture, stop_network_capture -->
 | 存储 | `cookies(action='get', ...)` `cookies(action='set', ...)` `delete_cookies` `get_storage` `set_storage` `export_state` `import_state` | 状态管理 | <!-- v3.1.0: migrated from get_cookies, set_cookies -->
 | 反检测 | `get_fingerprint_info` `check_detection` `bypass_debugger_trap` | 指纹与反检测 |

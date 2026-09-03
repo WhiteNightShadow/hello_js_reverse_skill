@@ -186,7 +186,7 @@ python main.py
 
 ## MCP 工具集成
 
-本 Skill 围绕 [`camoufox-reverse` MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) 服务器组织能力（Camoufox 反检测浏览器，**32 个核心工具，v1.0.0 统一 API**）：
+本 Skill 围绕 [`camoufox-reverse` MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) 服务器组织能力（Camoufox 反检测浏览器与统一 API）：
 - 源码级插桩 `instrumentation(action='install', mode="ast")` — MCP 侧 esprima 实现，挑战页可用
 - 签名安全观察 `hook_jsvmp_interpreter(mode="transparent")` — 仅 prototype getter 替换
 - Cookie 归因 `analyze_cookie_sources` — 区分 Set-Cookie 与 document.cookie
@@ -207,6 +207,7 @@ python main.py
 | `intercept_request` | 拦截/修改/Mock 网络请求 |
 | `cookies(action='get'\|'set'\|'delete')` | Cookie 管理 |
 | `compare_env` | 全面收集浏览器环境，用于补环境对照 |
+| `trace_property_access(action=...)` | reverse.4 的 75 点 Gecko 原生追踪；支持 start→操作→stop、kind/site 过滤和覆盖边界 |
 | `verify_signer_offline` | 用真实样本离线验证签名代码 |
 | `evaluate_js` | 在页面执行任意 JS |
 | `export_state` / `import_state` | 保存/恢复浏览器状态 |
@@ -258,12 +259,13 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.1.1**: 反检测浏览器逆向分析（35 个工具，统一 API，含源码级插桩、Cookie 归因和引擎层属性追踪）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.4.0**: 反检测浏览器逆向分析（统一 API，含源码级插桩、Cookie 归因与可选 Gecko 原生属性追踪）
 
 ## 版本记录
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.5.0 | 2026-09-03 | 对齐 MCP v1.4.0 / Camoufox Reverse reverse.4；默认保留 sandbox，新增交互式原生追踪、75 点证据边界、安全 snapshot 与 side-by-side 安装规则 |
 | v3.4.1 | 2026-07-29 | 增加 AST 源码插桩执行健康门禁；对齐 camoufox-reverse MCP v1.1.1；保持正常插桩流程不变，仅在异常时进入安全降级 |
 | v3.3.1 | 2026-04-21 | 经验法则精简：移除单站点经验（env-patch 行数阈值 / UA 矩阵 / cacheOpts 三件套），合并 evaluate_js 相关为 1 条，总数从 24 压缩到 22 条 |
 | v3.3.0 | 2026-04-19 | 核心层回归扩容：Phase 1-5 详细动作 + 10 个场景速查 + 经验法则回迁核心层；案例层强化（禁动清单 + UA 分支矩阵） |

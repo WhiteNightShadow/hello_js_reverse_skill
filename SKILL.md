@@ -4,7 +4,7 @@ description: >
   Node.js / Python 接口自动化与签名还原工程技能：对自有平台或已授权平台的 Web API 进行签名分析与接口对接，
   通过 Camoufox 反检测浏览器动态调试与静态源码分析，定位并还原前端加密/签名逻辑，
   使用 Node.js 或 Python 实现算法复现与自动化接口调用。
-  深度集成 camoufox-reverse MCP（C++ 引擎级指纹伪装，35 个逆向分析工具）。
+  深度集成 camoufox-reverse MCP（C++ 引擎级指纹伪装与 Gecko 原生调试能力）。
   擅长 JSVMP 虚拟机保护的双路径攻克：路径 A 算法追踪（Hook / 插桩 / 日志分析 / 源码级插桩四板斧），
   路径 B 环境伪装（jsdom/vm 沙箱 + 浏览器环境采集对比 + 全量补丁）。
   v3.0.0 硬约束 Checklist + 红线四条 + 经验法则压缩。
@@ -13,6 +13,7 @@ description: >
   v3.3.0 核心层回归扩容：Phase 1-5 详细动作 + 10 个场景速查 + 经验法则回迁核心层。
   v3.3.1 经验法则精简至 22 条：移除单站点经验，合并 evaluate_js 规则。
   v3.4.1 增加 AST 源码插桩执行健康门禁，区分原始源码解析失败与改写产物执行失败。
+  v3.5.0 对齐 MCP v1.4.0 / Camoufox Reverse reverse.4：安全默认启动、交互式原生追踪、覆盖边界与并存安装。
 ---
 
 # ⚠️ 硬约束 Checklist（分析启动前必做，不可跳过）
@@ -188,7 +189,7 @@ AI 输出格式（必须以此结构复述并填空）：
 **脚本**：scripts(action='list'|'get'|'save') / search_code(keyword, script_url=None)
 **Hook**：hook_function(mode='intercept'|'trace') / inject_hook_preset / remove_hooks / get_console_logs
 **网络**：network_capture(action='start'|'stop'|'clear'|'status') / list_network_requests / get_network_request / get_request_initiator / intercept_request
-**JSVMP**：hook_jsvmp_interpreter / instrumentation(action='install'|'log'|'stop'|'reload'|'status') / compare_env
+**JSVMP**：hook_jsvmp_interpreter / instrumentation(action='install'|'log'|'stop'|'reload'|'status') / compare_env / trace_property_access(action='start'|'stop'|'query'|'capture'|'clear'|'status')
 **Cookie 与存储**：cookies(action='get'|'set'|'delete') / get_storage / export_state / import_state
 **验证**：verify_signer_offline(signer_code, samples=[...])
 **环境与自检**：check_environment / reset_browser_state
@@ -200,7 +201,7 @@ AI 输出格式（必须以此结构复述并填空）：
 ### 启动流程
 
 ```
-launch_browser(headless=false, enable_trace=true)
+launch_browser(headless=false)
 → navigate(url="目标URL")
 → cookies(action='set', cookies_list=[...])  # 如有 Cookie
 → reload()                                    # 使 Cookie 生效
@@ -247,9 +248,8 @@ launch_browser(headless=false, enable_trace=true)
 
 ```
 MCP 操作：
-  launch_browser(headless=false, enable_trace=true)
-  → 启动反检测浏览器（enable_trace=true 启用引擎层属性追踪，
-     需要 camoufox-reverse 定制版浏览器；未安装时自动忽略，不影响其他功能）
+  launch_browser(headless=false)
+  → 默认启动反检测浏览器，不启用原生追踪，保留正常 content sandbox
 
   navigate(url="目标URL")
   → 导航到目标页面
@@ -504,11 +504,11 @@ Actions:
            定位解释器核心分发函数（while-switch 循环）
   步骤 4：分层 hook_function(function_path=fn, mode='trace', max_captures=N)
            粗→中→细，逐步缩小范围
-  步骤 5：hook_jsvmp_interpreter(mode='proxy', trackProps=True)
+  步骤 5：hook_jsvmp_interpreter(mode='proxy', track_props=True)
            监控签名容器 + compare_env 采集环境基准
 
 第三板斧：日志分析（从海量数据提取签名链路）
-  步骤 6：instrumentation(action='log') + get_jsvmp_log + get_console_logs
+  步骤 6：instrumentation(action='log') + evaluate_js("window.__mcp_jsvmp_log || []") + get_console_logs
            → 多维度过滤
   步骤 7：反向追踪法 — 从已知签名值反向搜索首次出现位置
   步骤 8：evaluate_js 验证提取的算法，对比签名结果
@@ -643,44 +643,62 @@ Actions:
 
 #### 3.0 环境指纹采集（路径 B 核心突破点）
 
-> v3.4.0 新增。用于路径 B 环境伪装时精准确定"JSVMP 读了哪些属性"。
+> v3.5.0 对齐 MCP v1.4.0 与 Camoufox Reverse reverse.4。默认分析路径不启用
+> 原生追踪；仅在路径 B 确实需要时显式选择定制版。
 
 ```
-判断 camoufox-reverse 定制版是否可用：
-  check_environment() → camoufox_reverse.installed
+默认分析路径：
+  launch_browser()  # enable_trace=False，保留官方 active 与正常 sandbox
 
-├─ YES（已装定制版 + trace_active）
-│   → close_browser() 关闭当前浏览器（如已启动）
-│   → launch_browser(enable_trace=True)
-│   → navigate(url="目标页面")
-│   → trace_property_access(duration=0, mode="summary", collect_values=True)
-│   → 获得 JSVMP 实际读取的属性列表 + 真实值（精准，C++ 层拦截，JSVMP 不可检测）
-│   → collect_values=True 自动从浏览器读取所有属性的真实值
-│     （大值如 Canvas dataURL、WebGL extensions 自动保存到 ~/.cache/camoufox-reverse/values/）
-│   → 只补这些属性（狙击式补环境）
-│
-└─ NO（官方 Camoufox 或未启用 trace）
-    → compare_env() + 分批 evaluate_js 采集
-    → 与 jsdom 环境全量 diff
-    → 按影响分级修复（撒网式补环境）
-    → 此为 v3.3.0 的传统流程，未破坏
+需要 Gecko 原生追踪时：
+  check_environment()
+  → 确认 camoufox.multiversion_supported=True
+  → 从 camoufox_reverse.available_selectors 取得精确 reverse selector
+  → close_browser()（已有浏览器时）
+  → launch_browser(
+      browser_version="<available_selectors 返回的精确 selector>",
+      enable_trace=True
+    )
+  → 必须确认返回 engine_trace.enabled=True
+
+交互式追踪窗口：
+  trace_property_access(action="start")
+  → navigate / click / evaluate_js 触发目标行为
+  → trace_property_access(
+      action="stop",
+      mode="summary",
+      collect_values=True
+    )
+
+其他动作：
+  action="query"   → 不停止，读取当前窗口（禁止 collect_values，避免自污染）
+  action="capture" → 新建并阻塞指定 duration 的窗口
+  action="status"  → 查看当前 run 与 native acknowledgement
+  action="clear"   → 只清理当前 launch 的 trace 与 snapshot
+
+不可用时：
+  → compare_env() + 分批 evaluate_js 采集
+  → 与 jsdom 环境全量 diff
 ```
 
-**为什么引擎层 trace 更精准**：
-- `trace_property_access` 返回的是 JSVMP **实际访问过**的属性，按热度排序
-- `compare_env` 返回的是"所有不同的属性"，其中大部分 JSVMP 根本不读
-- 两者输出量级差异：trace 通常 30-50 项；compare_env 通常几百项
+**证据边界（不可省略）**：
 
-**多视图查询**（按需深入）：
+- PropertyTracer 是由 **75 个显式注入点**组成的 Gecko 原生 DOM/Web API
+  覆盖集，不是任意 SpiderMonkey 属性、JS 对象、VM PC/opcode 或字节码追踪器。
+- 命中是强正证据；未命中不是“未访问”的证明。必须检查
+  `coverage.negative_result_is_conclusive=false`。
+- `possibly_capped=true` 或 `input_truncated=true` 时结果可能不完整。
+- 它不改写页面 JS 对象、descriptor 或 prototype；高频记录仍可能产生 timing
+  side channel，不能描述为“完全不可检测”。
+- trace 用于确定优先调查对象；不能据此直接认定“只需补这些属性”。
+- `collect_values=True` 仅在 summary 结果上执行追踪结束后的安全 JS 快照。
+  `snapshot_values/values` 不是事件发生时的值；Cookie、Canvas、WebGL、
+  AudioContext 等敏感或有副作用的路径进入 `values_skipped`。
 
-| mode | 用途 | 场景 |
-|---|---|---|
-| summary（默认） | 属性热度统计 | 补环境时看"要补哪些" |
-| timeline | 按时间分桶 | 看"什么时候访问什么"，定位检测阶段 |
-| sequence | 按顺序返回事件 | 看"访问顺序"，重建检测逻辑 |
-| search | 搜索特定字符串 | 找"有没有访问 cookie / canvas / userAgent" |
-
-**定制版安装**：从 https://github.com/WhiteNightShadow/camoufox-reverse/releases 下载对应平台 zip，替换 Camoufox 缓存目录。不装对其他 32 个工具无影响。
+**并存安装规则**：使用 Camoufox Python 0.5+ 和 release 附带的 installer +
+SHA-256，将 reverse.4 安装到 `browsers/whitenightshadow/...`；官方 active 必须与
+reverse build 的完整 version/build 一致。通过 `browser_version` 只为一次 MCP
+launch 选择定制版。不得覆盖/清空缓存、改变持久化 active 或自动迁移 0.4 用户。
 
 #### 3.1 Hook 注入验证
 
@@ -1350,8 +1368,9 @@ verify_signer_offline(
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.5.0 | 2026-09-03 | 对齐 MCP v1.4.0 / reverse.4：普通任务默认不启用 trace；新增 start→操作→stop 交互窗口、75 点覆盖边界、负证据限制、安全 snapshot 语义与 side-by-side 安装规则 |
 | v3.4.1 | 2026-07-29 | 增加 AST 插桩执行健康门禁：`files_rewritten` 只表示完成改写，必须继续验证 runtime 标记；失败时按通用梯度降级，不引入站点特例 |
-| v3.4.0 | 2026-04-22 | Phase 3 新增引擎层追踪分支（trace_property_access）。依赖 camoufox-reverse 定制版浏览器 + MCP v1.1.0。装了定制版后补环境从"全量 diff"升级到"精准 trace"，未装定制版自动降级到 compare_env，无破坏性变化。JS 层零痕迹，JSVMP 不可检测 |
+| v3.4.0 | 2026-04-22 | Phase 3 新增原生追踪分支（trace_property_access）。依赖 camoufox-reverse 定制版浏览器 + MCP v1.1.0；未安装时继续使用 compare_env |
 | v3.3.1 | 2026-04-19 | 经验法则精简至 22 条：移除单站点经验，合并 evaluate_js 规则 |
 | v3.3.0 | 2026-04-19 | 核心层回归扩容：Phase 1-5 详细动作 + 10 个场景速查 + 经验法则回迁核心层 |
 | v3.2.0 | 2026-04-18 | 移除 MCP session 依赖，Checklist 压缩到三项，cases/ 成为唯一经验库 |

@@ -4,7 +4,7 @@
 >
 > **前置要求**：已完成反爬类型三分法识别 + 路径选择决策树（见 SKILL.md）
 >
-> **版本**：v3.1.0（MCP v0.9.0 工具名迁移）
+> **版本**：v3.5.0（MCP v1.4.0；原生 75 点追踪为可选正证据）
 
 ---
 
@@ -74,6 +74,11 @@ navigate({url: "目标页面", wait_until: "domcontentloaded"})
 compare_env()
 → 采集主流环境基准数据（navigator/screen/canvas/WebGL/Audio/timing）
 ```
+
+如 `check_environment()` 返回兼容的 reverse.4 selector，可按 SKILL.md Phase 3
+另启定制版并执行 `trace_property_access(action="start")` → 目标行为 →
+`action="stop"`。它只覆盖 75 个 Gecko 原生注入点：命中可提高补丁优先级，未命中
+不能排除属性使用，仍需 `compare_env` 与分批 `evaluate_js` 补全证据。
 
 ### 分批采集细粒度环境值（4-5 批次）
 

@@ -1,6 +1,6 @@
 # JSVMP 源码级插桩专项指南（第四板斧）
 
-> **v2.5.0 新增文档，v3.4.1 更新健康诊断**。当前执行接口以 camoufox-reverse MCP v1.1.1 的 `instrumentation(action=...)` 为准；文中的旧工具名只用于解释能力来源。
+> **v2.5.0 新增文档，v3.5.0 对齐 MCP v1.4.0**。当前执行接口以 `instrumentation(action=...)` 为准；文中的旧工具名只用于解释能力来源。
 >
 > 与 `jsvmp-analysis.md` 的第一/二/三板斧互补——前三板斧诊断"VM 看外界 / 外界看 VM"，本文档讲解"VM 看自己"。
 

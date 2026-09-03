@@ -4,7 +4,7 @@
 >
 > **前置要求**：已完成反爬类型三分法识别（见 SKILL.md「反爬类型识别与工具选择」段）
 >
-> **版本**：v3.4.1（MCP v1.1.1，增加 AST 插桩执行健康门禁）
+> **版本**：v3.5.0（MCP v1.4.0；区分 JS Proxy 与 Gecko 原生 75 点追踪）
 
 ---
 
@@ -21,8 +21,8 @@
 | 板斧 | 名称 | 工具 | 擅长 | 不擅长 | 适用反爬类型 |
 |------|------|------|------|--------|-------------|
 | 第一斧 | Hook I/O | `inject_hook_preset(xhr/fetch/crypto/cookie)` + `hook_function('X.prototype.Y', mode='intercept', ...)` <!-- v3.1.0: migrated from freeze_prototype --> | 请求链路劫持、动态 Cookie、加密原语入口 | VM 内部自实现的 MD5/AES | 行为型 ✅ / 纯混淆 ✅ / 签名型 ❌ |
-| 第二斧 | 插桩解释器 | `hook_function(path, mode='trace', ...)` <!-- v3.1.0: migrated from trace_function --> + `hook_jsvmp_interpreter(mode='proxy', trackProps=True)` <!-- v3.1.0: migrated from trace_property_access --> | 能识别分发函数名时的调用链追踪 | 匿名 IIFE 包裹 + 高频日志爆炸 | 行为型 ✅ / 纯混淆 ✅ / 签名型 ❌ |
-| 第三斧 | 日志分析 | `get_jsvmp_log` + 反向追踪 | 已能捕获签名值 I/O 时反推公式 | 签名完全不出 VM 的黑箱模式 | 所有类型 ✅（纯被动分析，无副作用） |
+| 第二斧 | 插桩解释器 | `hook_function(path, mode='trace', ...)` + `hook_jsvmp_interpreter(mode='proxy', track_props=True)` | 能识别分发函数名时的调用链追踪 | 匿名 IIFE 包裹 + 高频日志爆炸 | 行为型 ✅ / 纯混淆 ✅ / 签名型 ❌ |
+| 第三斧 | 日志分析 | `evaluate_js("window.__mcp_jsvmp_log || []")` + 反向追踪 | 已能捕获签名值 I/O 时反推公式 | 签名完全不出 VM 的黑箱模式 | 所有类型 ✅（读取已采集日志） |
 | 第四斧 | 源码级插桩 | `instrumentation(action='install', ...)` <!-- v3.1.0: migrated from instrument_jsvmp_source --> + `instrumentation(action='log', ...)` <!-- v3.1.0: migrated from get_instrumentation_log --> | VM 内部调度、"全部在 opcode dispatch 循环里发生"的场景，`hot_keys` 直接暴露环境指纹集 | 极限大文件（5MB+）开销高；改写后必须验证 runtime 已执行 | 所有类型 ✅，**签名型首选** |
 
 ### 按反爬类型的适用性
@@ -72,7 +72,7 @@
   → 看 hot_keys / hot_methods / hot_functions 三个摘要
 
 步骤 8：交叉印证
-  get_jsvmp_log() + analyze_cookie_sources()
+  evaluate_js("window.__mcp_jsvmp_log || []") + analyze_cookie_sources()
 ```
 
 ---
@@ -192,8 +192,7 @@ MCP 操作（粗粒度 → 中粒度 → 细粒度）：
 
 ```
 MCP 操作：
-  hook_jsvmp_interpreter(mode='proxy', trackProps=True)
-  <!-- v3.1.0: migrated from trace_property_access -->
+  hook_jsvmp_interpreter(mode='proxy', track_props=True)
   → 监控 navigator.*/screen.*/document.cookie 等签名容器的属性读取
 
   compare_env()
@@ -215,7 +214,7 @@ MCP 操作：
 ```
 MCP 操作：
   get_trace_data()                    → 函数追踪数据
-  get_jsvmp_log()                     → JSVMP 探针日志
+  evaluate_js("window.__mcp_jsvmp_log || []") → JSVMP 探针日志
   get_console_logs()                  → 控制台输出
   get_runtime_probe_log()             → 运行时探针日志
 ```
@@ -391,7 +390,7 @@ L6: 向用户说明情况，建议浏览器自动化或 sdenv
 
 | 情况 | 策略 | 实现方式 |
 |------|------|---------|
-| 签名使用标准算法（MD5/HMAC/AES），`get_jsvmp_log` 能看到对应 API 调用 | 纯算法还原 | Node.js `crypto` / Python `hashlib` + `pycryptodome` |
+| 签名使用标准算法（MD5/HMAC/AES），JSVMP 日志能看到对应 API 调用 | 纯算法还原 | Node.js `crypto` / Python `hashlib` + `pycryptodome` |
 | 签名逻辑是标准算法但拼接规则复杂 | 还原拼接逻辑 + 标准算法 | 提取拼接顺序和格式，手动实现 |
 | 签名逻辑完全定制化，但 `hot_keys` 清晰暴露输入域 | 提取最小 JS 片段执行 | Node.js `vm` 沙箱 / Python `execjs` |
 | VM 劫持了整个请求链路，`analyze_cookie_sources` 显示 cookie 来自 HTTP Set-Cookie | 纯算法还原不现实 | 转路径 B：jsdom 环境伪装 |
