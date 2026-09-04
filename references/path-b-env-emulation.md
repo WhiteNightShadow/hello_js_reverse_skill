@@ -4,7 +4,7 @@
 >
 > **前置要求**：已完成反爬类型三分法识别 + 路径选择决策树（见 SKILL.md）
 >
-> **版本**：v3.5.1（MCP v1.4.1；原生固定点追踪为可选正证据）
+> **版本**：v3.6.0（MCP v1.5.0；主世界/Frame 对照与原生固定点追踪）
 
 ---
 
@@ -75,6 +75,10 @@ compare_env()
 → 采集固定 JS 环境基线（navigator/screen/timezone）；其他属性用
   `properties` 或分批 `evaluate_js` 扩展
 ```
+
+若目标 SDK 将函数或状态挂到页面主世界，浏览器基准采集必须显式使用
+`evaluate_js(..., world="main")`；先从 `get_page_info().frames` 确认实际 Frame，
+避免把隔离上下文的 `undefined` 或错误 Frame 当成环境缺项。
 
 如 `check_environment()` 返回兼容的 reverse.5 selector，可按 SKILL.md Phase 3
 另启定制版并执行 `trace_property_access(action="start")` → 目标行为 →

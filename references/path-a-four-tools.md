@@ -4,9 +4,15 @@
 >
 > **前置要求**：已完成反爬类型三分法识别（见 SKILL.md「反爬类型识别与工具选择」段）
 >
-> **版本**：v3.5.1（MCP v1.4.1；区分 JS Proxy 与 Gecko 原生固定点追踪）
+> **版本**：v3.6.0（MCP v1.5.0；区分隔离/主世界、JS Proxy 与 Gecko 原生固定点追踪）
 
 ---
+
+页面脚本自有全局在隔离上下文中可能不可见。Hook 前先用 `get_page_info().frames`
+确认 Frame，再对页面函数显式使用 `hook_function(..., world="main")`；跨导航或
+有界等待内的常见赋值式异步挂载函数使用 `persistent=True`。返回 `pending` 只表示
+持久脚本已注册、当前文档尚未安装 Hook；必要时调整 `wait_timeout_ms` 或通过
+reload/navigation 重试，并用触发结果和 `get_trace_data` 确认是否命中。
 
 ## 一、四板斧总览
 

@@ -1,10 +1,20 @@
-# MCP v1.4.1 工具索引 + v0.9.0 迁移历史
+# MCP v1.5.0 工具索引 + v0.9.0 迁移历史
 
 > **说明**：当前可调用工具以 SKILL.md 核心层和 MCP 工具自身 docstring 为准；本文后半部分保留 v0.8.x → v0.9.0 的历史迁移映射。
 >
-> **版本**：v3.5.1（MCP v1.4.1）
+> **版本**：v3.6.0（MCP v1.5.0）
 >
-> **当前 MCP 版本**：camoufox-reverse MCP v1.4.1。当前可调用参数以工具 docstring 为准；不要从历史表推断现行工具。
+> **当前 MCP 版本**：camoufox-reverse MCP v1.5.0。当前可调用参数以工具 docstring 为准；不要从历史表推断现行工具。
+
+### 主世界、Frame 与函数 Trace（v1.5.0）
+
+- `evaluate_js` 默认保留隔离上下文；页面自有全局需显式 `world="main"`。
+- `get_page_info().frames` 提供当前 Frame 快照；`frame_url/frame_name` 支持精确值或
+  `*`/`?` 通配，`frame_index` 只表示当前快照，持久 Hook 禁止使用它。
+- `hook_function(..., persistent=True, world="main")` 可在有界等待内监听常见的赋值式
+  异步挂载；`pending` 只表示持久脚本已注册、当前文档尚未安装 Hook，必要时调整
+  `wait_timeout_ms` 或通过 reload/navigation 重试，后续仍需通过 Trace 确认。
+- `get_trace_data` 是函数 Trace 的读取/清理入口，可按 world 与 Frame 过滤。
 
 ### 当前原生 PropertyTracer（v1.1+，v1.4 增强）
 

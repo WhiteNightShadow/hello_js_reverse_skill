@@ -13,7 +13,7 @@ description: >
   v3.3.0 核心层回归扩容：Phase 1-5 详细动作 + 10 个场景速查 + 经验法则回迁核心层。
   v3.3.1 经验法则精简至 22 条：移除单站点经验，合并 evaluate_js 规则。
   v3.4.1 增加 AST 源码插桩执行健康门禁，区分原始源码解析失败与改写产物执行失败。
-  v3.5.1 对齐 MCP v1.4.1 / Camoufox Reverse reverse.5：安全默认启动、交互式原生追踪、覆盖边界与并存安装。
+  v3.6.0 对齐 MCP v1.5.0：增加显式主世界、Frame 选择、动态目标持久 Hook 与 Trace 读取约束。
 ---
 
 # ⚠️ 硬约束 Checklist（分析启动前必做，不可跳过）
@@ -219,7 +219,7 @@ launch_browser(headless=false)
 ### 关键规则
 
 - Camoufox **只用于分析和验证**，不作为最终方案的运行时依赖
-- 所有 Hook 默认 `persistent=True`（跨导航持久化）
+- `inject_hook_preset` 默认 `persistent=True`；`hook_function` 默认 `False`，需要跨导航时必须显式开启
 - 装完 Hook 后用 `instrumentation(action='reload')` 确保 Hook 先于页面 JS 执行
 - `navigate` 的 `collect_response_chain=True` 默认开启，记录完整响应链
 - 签名型反爬（RS/Akamai）首次导航**不加任何 hook**，先观察 redirect_chain 判断类型
@@ -643,7 +643,7 @@ Actions:
 
 #### 3.0 环境指纹采集（路径 B 核心突破点）
 
-> v3.5.1 对齐 MCP v1.4.1 与 Camoufox Reverse reverse.5。默认分析路径不启用
+> v3.6.0 对齐 MCP v1.5.0 与 Camoufox Reverse reverse.5。默认分析路径不启用
 > 原生追踪；仅在路径 B 确实需要时显式选择定制版。
 
 ```
@@ -680,6 +680,24 @@ Actions:
   → compare_env() + 分批 evaluate_js 采集
   → 与 jsdom 环境全量 diff
 ```
+
+**页面主世界与 Frame 规则**：
+
+- Camoufox 默认 `page.evaluate` 使用隔离上下文；页面脚本挂到 `window` 的扩展属性
+  可能不可见。默认 `evaluate_js(..., world="isolated")` 保持兼容；确需读取页面
+  自有全局或 Hook 页面函数时，显式使用 `world="main"`。
+- `world="main"` 优先走 Camoufox 原生 `mw:` 通道；原生通道不可用时，MCP 会明确
+  标记 Firefox `wrappedJSObject` 回退，禁止静默退回隔离世界后把 `undefined` 当真实结果。
+- 先用 `get_page_info()` 查看 `frames`，再按需传 `frame_url`、`frame_name` 或当前
+  快照的 `frame_index`。持久 Hook 不得使用易变化的 `frame_index`。
+- 页面函数可能异步挂载。需要跨导航捕获时使用
+  `hook_function(..., persistent=True, world="main")`；返回 `pending` 表示脚本已注册、
+  当前文档尚未安装 Hook，不能当作已经命中。当前等待有上限；必要时调整
+  `wait_timeout_ms`，或通过后续 reload/navigation 让持久脚本重试。
+- 函数 Trace 用 `get_trace_data` 读取，并按需传 `world`、`frame_url`、`frame_name`
+  或 `frame_index`；不要只看 `get_console_logs`。主世界对象与函数由页面控制，
+  参数/返回值仍按不可信数据处理。捕获数量和缓存均有上限，空结果不能单独证明
+  目标函数没有执行。
 
 **证据边界（不可省略）**：
 
@@ -1184,7 +1202,7 @@ Cookie 归因路径：
 - 优先用 `inject_hook_preset` 而非手写 Hook
 - 优先用 `instrumentation(action='install')` 而非逐个 `hook_function`
 - 分析产物第一时间写入 `config/` 文件，不要内联长字符串
-- Hook 默认 `persistent=True`，跨导航自动重注入
+- `inject_hook_preset` 默认持久化；`hook_function` 需要跨导航时显式传 `persistent=True`
 - `hook_function(..., non_overridable=True)` 防止页面 JS 覆盖你的 Hook
 
 ### 调试方法论
@@ -1375,6 +1393,7 @@ verify_signer_offline(
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.6.0 | 2026-09-04 | 对齐 MCP v1.5.0：显式主世界、Frame 选择、动态目标持久 Hook、`pending` 语义与 `get_trace_data` |
 | v3.5.1 | 2026-09-03 | 对齐 MCP v1.4.1 / reverse.5：LocalStorage 迁移到 Firefox 152 LSNG，并覆盖可达的 partitioned 分支；固定覆盖集增至 77 点，protocol 1 不变 |
 | v3.5.0 | 2026-09-03 | 对齐 MCP v1.4.0 / reverse.4：普通任务默认不启用 trace；新增 start→操作→stop 交互窗口、75 点覆盖边界、负证据限制、安全 snapshot 语义与 side-by-side 安装规则 |
 | v3.4.1 | 2026-07-29 | 增加 AST 插桩执行健康门禁：`files_rewritten` 只表示完成改写，必须继续验证 runtime 标记；失败时按通用梯度降级，不引入站点特例 |

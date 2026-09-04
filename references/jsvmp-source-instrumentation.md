@@ -1,6 +1,6 @@
 # JSVMP 源码级插桩专项指南（第四板斧）
 
-> **v2.5.0 新增文档，v3.5.1 对齐 MCP v1.4.1**。当前执行接口以 `instrumentation(action=...)` 为准；文中的旧工具名只用于解释能力来源。
+> **v2.5.0 新增文档，v3.6.0 对齐 MCP v1.5.0**。当前执行接口以 `instrumentation(action=...)` 为准；文中的旧工具名只用于解释能力来源。
 >
 > 与 `jsvmp-analysis.md` 的第一/二/三板斧互补——前三板斧诊断"VM 看外界 / 外界看 VM"，本文档讲解"VM 看自己"。
 
@@ -421,4 +421,4 @@ get_runtime_probe_log(type_filter="canvas_toDataURL", limit=50)
 - `references/jsdom-env-patches.md`：环境伪装补丁库（路径 B）
 - `references/mcp-cookbook.md` 场景 6：源码级插桩场景化操作
 - `cases/universal-vmp-source-instrumentation.md`：骨架案例模板
-- MCP 上游：https://github.com/WhiteNightShadow/camoufox-reverse-mcp（当前基线 v1.4.1）
+- MCP 上游：https://github.com/WhiteNightShadow/camoufox-reverse-mcp（当前基线 v1.5.0）

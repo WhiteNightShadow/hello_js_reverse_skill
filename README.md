@@ -197,7 +197,9 @@ python main.py
 | `launch_browser` / `navigate` | 启动反检测浏览器并导航到目标页面 |
 | `search_code(keyword, script_url=None)` | 在所有/指定 JS 中搜索关键词 |
 | `scripts(action='list'\|'get'\|'save')` | 列出/获取/保存脚本 |
-| `hook_function(mode='intercept'\|'trace')` | 自定义 Hook / 函数追踪（支持 non_overridable 防覆盖） |
+| `evaluate_js(..., world='isolated'\|'main')` | 执行 JS；默认隔离上下文保持兼容，可显式进入页面主世界并按 Frame 定位 |
+| `hook_function(mode='intercept'\|'trace')` | 自定义 Hook / 函数追踪；可选择主世界与 Frame，跨导航或有界等待动态挂载需设置 `persistent=True` |
+| `get_trace_data` | 读取或清理函数 Trace，可按 world 与 Frame 过滤 |
 | `inject_hook_preset` | 一键预设 Hook（xhr/fetch/crypto/websocket/debugger_bypass/cookie/runtime_probe） |
 | `hook_jsvmp_interpreter` | 一键插桩 JSVMP 解释器（proxy / transparent 两种模式） |
 | `instrumentation(action='install'\|'log'\|'stop'\|'reload')` | 源码级插桩：HTTP 层改写 VMP + 日志 + 重载 |
@@ -209,7 +211,6 @@ python main.py
 | `compare_env` | 采集固定 JS 环境基线；其他属性需通过 `properties` 或分批 `evaluate_js` 扩展 |
 | `trace_property_access(action=...)` | reverse.5 的 77 点 Gecko 原生追踪（旧兼容构建为 75 点）；支持 start→操作→stop、kind/site 过滤和覆盖边界 |
 | `verify_signer_offline` | 用真实样本离线验证签名代码 |
-| `evaluate_js` | 在页面执行任意 JS |
 | `export_state` / `import_state` | 保存/恢复浏览器状态 |
 | `check_environment` / `reset_browser_state` | 环境自检 / 清理残留状态 |
 
@@ -259,12 +260,13 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.4.1**: 反检测浏览器逆向分析（统一 API，含源码级插桩、Cookie 归因与可选 Gecko 原生属性追踪）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.5.0**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩、Cookie 归因与可选 Gecko 原生属性追踪）
 
 ## 版本记录
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.6.0 | 2026-09-04 | 对齐 MCP v1.5.0；新增主世界与 Frame 选择、动态目标持久 Hook、`pending` 状态和 Trace 数据读取规范 |
 | v3.5.1 | 2026-09-03 | 对齐 MCP v1.4.1 / Camoufox Reverse reverse.5；LocalStorage 覆盖迁移至 Firefox 152 LSNG，并纳入可达的 partitioned 分支，protocol 1 不变 |
 | v3.5.0 | 2026-09-03 | 对齐 MCP v1.4.0 / Camoufox Reverse reverse.4；默认保留 sandbox，新增交互式原生追踪、75 点证据边界、安全 snapshot 与 side-by-side 安装规则 |
 | v3.4.1 | 2026-07-29 | 增加 AST 源码插桩执行健康门禁；对齐 camoufox-reverse MCP v1.1.1；保持正常插桩流程不变，仅在异常时进入安全降级 |
