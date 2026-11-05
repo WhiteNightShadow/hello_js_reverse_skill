@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: cross-surface-header
+expected_outcome: |
+  回答不先逆向，要求先确定推广站接口的最小请求形态，不把买家站结论平移过来。

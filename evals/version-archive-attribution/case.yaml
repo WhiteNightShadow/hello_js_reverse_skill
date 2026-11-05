@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: version-archive-attribution
+expected_outcome: |
+  回答否定这个写法，分开记录身份，不归因单一原因，新建版本记录，写清层级和未验证项。

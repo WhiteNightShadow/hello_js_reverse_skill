@@ -1,6 +1,6 @@
 # MCP v1.8.0 工具契约
 
-配套 Skill v3.9.0。完整参数快照见 [mcp-tools.json](mcp-tools.json)，实际执行时优先读取已安装 MCP 的工具定义。不要将快照的新参数发送给旧版本。
+配套 Skill v3.10.0。完整参数快照见 [mcp-tools.json](mcp-tools.json)，实际执行时优先读取已安装 MCP 的工具定义。不要将快照的新参数发送给旧版本。
 
 ## v1.8.0 观测与返回契约
 
@@ -38,7 +38,24 @@
 
 ## 已移除的历史能力
 
-Session/Assertion 工具在 MCP v1.0.0 起已移除，使用需求工作区的 manifest/fixture 与 cases 文件。旧文档中的 start_network_capture、trace_function、set_breakpoint_via_hook 等不能直接调用；分别使用 network_capture(action='start')、hook_function(mode='trace')、get_trace_data。历史 API 列表可通过 Git 旧版本查阅，不作为现行调用依据。
+Session/Assertion 工具在 MCP v1.0.0 起已移除，使用需求工作区的 manifest/fixture 与 cases 文件。历史 API 列表可通过 Git 旧版本查阅，不作为现行调用依据。旧案例里的工具名按下表替换：
+
+| 旧名称 | 现行写法 |
+|---|---|
+| `start_network_capture` | `network_capture(action='start')` |
+| `get_script_source` | `scripts(action='get', url=...)` |
+| `get_cookies` | `cookies(action='get')` |
+| `trace_function`、`set_breakpoint_via_hook` | `hook_function(mode='trace')` + `get_trace_data` |
+| `add_init_script` | 无通用替代；预设用 `inject_hook_preset`，函数级用 `hook_function(..., persistent=True)` |
+| `bypass_debugger_trap` | `inject_hook_preset(preset="debugger_bypass")` |
+| `instrument_jsvmp_source`、`get_instrumentation_log`、`stop_instrumentation` | `instrumentation(action='install' / 'log' / 'stop')` |
+| `reload_with_hooks` | `instrumentation(action='reload')` |
+| `get_runtime_probe_log` | `inject_hook_preset(preset="runtime_probe")` 后读 `window.__mcp_runtime_log` |
+| `dump_jsvmp_strings`、`find_dispatch_loops` | `scripts(action='save')` 后本地分析，或 `search_code` |
+| `get_fingerprint_info`、`check_detection` | `compare_env`、`evaluate_js` |
+| `analyze_cookie_sources` | MCP v1.8.0 源码存在但未注册，按 [手动归因](analysis-scenarios.md#cookie-归因分析) |
+
+两处容易写错的名字：`inject_hook_preset` 的 Cookie 预设叫 `cookie`，`navigate(pre_inject_hooks=[...])` 里叫 `cookie_hook`，写成 `cookie` 会返回 unknown hook name。`navigate` 没有 `via_blank` 参数。
 
 ## 更新契约快照
 

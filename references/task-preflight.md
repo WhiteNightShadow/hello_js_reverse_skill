@@ -26,6 +26,8 @@
 | 导航或 Frame 变化 | get_page_info 与目标选择器；仅 Frame 变化不必重新扫描全部 Python 依赖 |
 | 登录态改变、401/403 或业务拒绝 | 当前 Cookie/鉴权与成功样本；避免先清全部 Cookie |
 | SDK/签名代码或需求配置改版 | manifest 差异 + 当前样本；只重新分析受影响部分 |
+| 准备发在线请求 | 按 [在线门禁](controlled-experiments.md#在线门禁) 检查版本、凭据余量、值是否未用过 |
+| 页面实际加载的 SDK 与本地不同 | 先同步并记录版本，再发请求；已发的不算候选失败 |
 | Hook/trace 策略变化 | 返回值、pending/实际 trace、卸载边界；不是默认重启所有浏览器 |
 | 错误页快照超时 | 使用 get_page_info 和已捕获的 document failure 定位；take_snapshot 有独立超时，不反复等待相同错误页 |
 | 抓包丢弃、pending、正文失败或截断 | network_capture(status) / 具体请求详情；必要时有意重采当前样本 |

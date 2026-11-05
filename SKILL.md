@@ -1,154 +1,154 @@
 ---
 name: hello_js_reverse_skill
 description: >
-  通用 Web API 数据采集、Node.js/Python 协议调用与前端签名分析。
-  使用 Camoufox MCP 捕获请求、调试 Hook、分析混淆/JSVMP/WASM，
-  交付可验证的采集程序，支持分页、断点续采和接口改版回归。
-  用于自有或已授权接口；微信小程序 wxapkg 解包使用对应小程序技能。
+  通用 Web API 采集与前端签名问题的方法论。只要任务涉及抓接口或写 Node/Python 协议程序、sign/token/动态 Cookie/自定义头、
+  本地生成的值服务端不认、HTTP 200 却是业务错误或空数据、浏览器能过本地不过、SDK 或接口改版失效、
+  混淆/JSVMP/WASM/补环境/Hook/插桩、参数跟踪与版本归档，就使用本 Skill，即使用户没有提到“逆向”。
+  配套 Camoufox MCP 取证，交付可验证的采集程序，支持分页、断点续采和改版回归。
+  仅用于自有或已授权接口；微信小程序 wxapkg 解包使用对应小程序技能。
 metadata:
-  version: "3.9.0"
+  version: "3.10.0"
   mcp-compatible: "1.8.0（旧工作流兼容 1.6.x / 1.7.x；新参数需对应工具 schema）"
 ---
 
 # 通用采集与签名分析
 
-本 Skill 提供工作方法、案例和协议模板；`camoufox-reverse-mcp` 提供浏览器分析工具。保持通用：域名、接口路径、字段、签名算法、Cookie 和分页规则来自当前需求，不能写进 MCP 的平台通用实现。
+本 Skill 是方法论，回答三件事：问题在哪一层、走哪条链路、做到什么证据才算收口。
+
+它不记录站点规则。域名、接口路径、字段、算法、错误码和 SDK 行为都来自当前目标。`cases/` 里的经验只是待验证的候选假设，换站点、换接口、换版本甚至换一天都可能不成立。`camoufox-reverse-mcp` 提供浏览器取证工具，同样不写站点特例。方法不绑定工具，换用其他浏览器或抓包工具时判断顺序不变。
 
 ## 启动与任务范围
 
-**首次任务检查一次，继续操作复用，相关状态变化时只复查受影响项。** 具体规则见 [任务级检查](references/task-preflight.md)。
+**首次任务检查一次，继续操作复用，相关状态变化时只复查受影响项。** 规则见 [任务级检查](references/task-preflight.md)。
 
-1. **按任务选路径**：代码维护/离线验签检查相关运行时和已有样本；普通协议采集确认鉴权、业务成功条件和分页；浏览器分析首次调用 `check_environment()`。不用浏览器的任务无需先过浏览器环境门槛。
-2. **复用证据**：先读需求工作区已有代码、任务记录与 `project-manifest.json`。只有遇到相应逆向特征时查 [cases/README.md](cases/README.md)，命中后验证当前适用性。不要每个工具调用前全量审查。
-3. **状态变化再重查**：浏览器重启/断连查环境与当前页；导航/Frame 变化只查页面；SDK/鉴权变化查相关基线和样本。`has_residuals` 可能是当前证据，不自动 reset；`state_fingerprint` 不是完整环境校验。
-4. **交付约定延续**：默认独立 Node.js/Python 协议程序；沿用用户已确认的采集字段、分页、鉴权和输出。用户明确要求页面自动化时可交付浏览器程序并声明依赖。
+1. **按任务选路径**：代码维护和离线验签检查运行时与已有样本；普通采集确认鉴权、业务成功条件和分页；浏览器分析首次调用 `check_environment()`，并读 [浏览器取证契约](references/browser-evidence-contract.md)。不用浏览器的任务不必过浏览器门槛。
+2. **复用证据**：先读需求工作区已有代码、任务记录与 `project-manifest.json`。遇到相应逆向特征时才查 [cases](cases/README.md)，命中后验证当前适用性。
+3. **状态变化再重查**：浏览器重启或断连查环境与当前页；导航或 Frame 变化只查页面；SDK 或鉴权变化查相关基线和样本。`has_residuals` 可能是当前证据，不自动 reset。
+4. **交付约定延续**：默认独立 Node.js/Python 协议程序，沿用用户已确认的字段、分页、鉴权和输出。用户明确要求页面自动化时可交付浏览器程序并声明依赖。
 
-用户已提供的授权与偏好持续有效。沿现有实现完成当前需求；仅在缺少关键登录态、访问条件或无法推断的业务约定时请求必要信息。仓库发布按当前用户授权执行，Skill 自身不扩大授权。
+用户已提供的授权与偏好持续有效。沿现有实现完成当前需求，仅在缺少关键登录态、访问条件或无法推断的业务约定时请求必要信息。仓库发布按当前用户授权执行，Skill 自身不扩大授权。
 
-## 通用采集优先路径
+## 先定义成功，再定位失败
 
-普通 JSON API 不必进入完整逆向流程，先读 [general-collection.md](references/general-collection.md)。
+成功分四层，下层推不出上层：
 
-- 配置字段包括 URL、Method、Headers、参数/Body、业务成功条件、数据路径、页码/offset/cursor 与总页数上限。
-- `templates/python-request/collect.py` 提供可运行的通用入口；`templates/python-request/utils/collector.py` 可接入自定义签名与鉴权回调，支持去重、JSONL 和断点恢复。核心模块只用标准库；有依赖限制时可复用它并配 urllib 回调，CLI 的 requests 依赖不等于核心也需要。
-- 对空中间页、显式 has_more、临时重复游标、业务重试与本次/累计页数限制，先读 [通用采集指南](references/general-collection.md) 的可选配置。按接口契约启用；默认行为保持兼容，不把一个模板当作无需适配的全部站点方案。
-- 每次请求现算动态签名；凭据可来自用户配置、合法登录态或协议刷新过程。不要把一次抓取的临时 Cookie 写死到公共模板。
-- HTTP 成功还需验证业务状态、数据结构与结束条件。超时、空响应、403/412 只是现象，需要通过证据区分原因。
-- 默认重试只用于 GET/HEAD/OPTIONS；POST 等请求发生不确定失败时，先确认幂等条件再重放。
+| 层级 | 含义 | 不算数的证据 |
+|---|---|---|
+| S1 能生成 | 本地产物结构合法 | 能跑出一个值 |
+| S2 被接受 | 服务端没有拒绝 | HTTP 200 |
+| S3 命中目标 | 响应正是请求的那份数据 | 响应非空 |
+| S4 可持续 | 多目标、连续、续期、跨天都成立 | 单条成功、离线等价 |
 
-## 浏览器采样与诊断
+失败分六层：传输、会话、请求形态、动态值、运行环境、服务端策略。403、空数据、错误码都可能来自任何一层，现象不定层，对照实验才定层。详见 [问题路由](references/problem-routing.md)。
 
-```text
-check_environment()
-launch_browser()                         # 默认不启用原生 trace
-network_capture(action="start", capture_body=True)
-navigate(url="<目标地址>")
-# 触发代表性操作；等待业务完成信号或确认本次目标请求已进入捕获
-network_capture(action="stop", wait_timeout_ms=3000)
-list_network_requests(limit=100, after_id=0)
-get_network_request(request_id=<捕获ID>, include_body=True)
-export_network_capture(save_path="<需求工作区>/artifacts/capture.json")
-```
+## 问题路由
 
-MCP v1.6.0 的采集契约：
+先按现象找到这一行，避开“先别下的结论”，再做第一步。
 
-- 响应通过原始 Request 对象关联，避免同 URL 并发串数据；完整 Cookie/Set-Cookie 头异步采集，检查 `headers_complete`。`get_request_initiator` 的 Hook 栈仍是 URL 匹配线索，查看 `match_confidence` 并交叉验证，不视为并发请求的精确归因。
-- 点击返回不代表异步签名/防抖请求已经发出。先依据页面业务信号或新增请求记录确认操作进展；不要靠重放点击补样本。`stop(wait_timeout_ms)` 不等待未来才发出的请求。
-- `stop` 停止新捕获，已捕获的请求仍可完成；`wait_timeout_ms` 有界等待后必须看 `pending_requests/pending_responses`。`clear/reset/close` 会取消当前实例的后台采集任务。
-- `body_state=skipped_capacity/failed/pending` 或 `dropped_requests>0` 表示证据不完整；默认保存正文上限 200,000 字符。Playwright 会先读取完整响应，保存上限不是下载内存上限。
-- 读取时区分 `response_body_capture_truncated` 和 `response_body_return_truncated`；`max_body_size=-1` 只取已保存内容，不补回已丢失的正文。
-- `after_id` 用于增量读取；ID 在当前浏览器实例关闭前单调递增，清理缓冲区不会复用旧 ID。
-- 导出默认掩码 Headers、URL 查询值并省略正文；路径仍保留，不等于完全匿名。确需原始样本时显式传 `include_sensitive=True`，需要正文再传 `include_body=True`，产物留在私有需求工作区。导出不覆盖已有文件。
-- Cookie 的 `name` 与 `domain` 删除条件取交集，域名按完整边界匹配；`analyze_cookie_sources(name_filter=...)` 仍为单个子串，不是正则。
+| 现象 | 先别下的结论 | 第一步 | 链路 |
+|---|---|---|---|
+| 只要数据，接口看起来没有签名 | 需要逆向 | 确认鉴权、业务成功条件和分页 | [通用采集](references/general-collection.md) |
+| 带 sign、token 或自定义头，还没动手 | 这个参数一定要算 | 重放成功请求，再按组删减 | [链路 A](references/problem-routing.md#链路-a这个参数到底要不要算) |
+| 别的接口或别的端需要某个头 | 这里也需要 | 按本接口单独验证，多发也可能被拒 | [链路 A](references/problem-routing.md#链路-a这个参数到底要不要算) |
+| HTTP 200 里是错误码、空数据或错误页 | 签名或环境错了 | 读业务码，对比同期成功样本 | [链路 B](references/problem-routing.md#链路-b服务端拒绝) |
+| 本地值结构合法但被拒 | 算法错了 | 恢复控制组，做来源替换 | [链路 B](references/problem-routing.md#链路-b服务端拒绝) |
+| 控制组也失败 | 候选失败了 | 停止归因，先恢复基线 | [控制组失效](references/controlled-experiments.md#控制组失效) |
+| 超时、连接失败、没发出去 | 被拒绝了 | 单独分类，确认实际尝试次数 | [结果分类](references/controlled-experiments.md#结果分类) |
+| 改了一项没变化 | 这一项无关 | 可能两道闸门并联，做交叉矩阵 | [交叉矩阵](references/controlled-experiments.md#单变量没有翻转时) |
+| 同一构造时好时坏 | 修好了或坏了 | 开稳定性批次，报成功数和翻转数 | [稳定性批次](references/controlled-experiments.md#结果时好时坏) |
+| 浏览器能过，本地同样的头不过 | TLS 指纹 | 先排除已用值和会话，再做传输对照 | [链路 C](references/problem-routing.md#链路-c浏览器能过本地同样的头不过) |
+| 之前能用，现在不行 | 代码坏了 | 比对 SDK 哈希，从最后成功基线回归 | [链路 D](references/problem-routing.md#链路-d之前能用现在不行) |
+| SDK 本地报错 | 补上报错这一项就好 | 沿调用链找真实缺口 | [链路 F](references/problem-routing.md#链路-fsdk-在本地跑不起来) |
+| SDK 能跑，值不被接受 | 再多补些环境 | 做读值差异，查首次读取缓存 | [链路 E](references/problem-routing.md#链路-e本地值能生成但不被接受) |
+| 固定输入下值和浏览器不同 | 算法全错 | 逐环节找首个偏差 | [签名值不一致](references/troubleshooting.md#签名值不一致排查) |
+| 值带随机掩码，无法逐字比较 | 无从下手 | 分批采样，分析信封和结构 | [不透明令牌](references/opaque-token-analysis.md) |
+| 混淆或 VM 挡住定位 | 一定要读懂 | 先问是否需要读懂，再定 I/O 边界 | [链路 G](references/problem-routing.md#链路-g混淆或-vm-挡住定位) |
+| 响应加密、WASM、WebSocket、字体映射 | 通用手段都能解 | 按对应场景取证 | [场景配方](references/analysis-scenarios.md) |
+| 动态 Cookie 来源不明 | 是 JS 写的 | 同时看 Set-Cookie 和 JS 写入 | [Cookie 归因](references/analysis-scenarios.md#cookie-归因分析) |
+| 首屏挑战、反调试 | 先装 Hook | 首次不加 Hook，先看响应链 | [反调试](references/anti-debug.md) |
+| Hook 没日志、插桩后行为变了 | 目标没执行或有检测 | 查 world、Frame、覆盖，比较原始与插桩 | [链路 I](references/problem-routing.md#链路-i观测本身有问题) |
+| 单条成功，批量失败 | 算法不稳 | 看失败与次数、时间、账号的相关性 | [链路 H](references/problem-routing.md#链路-h单条成功批量失败) |
+| 429、验证页、账号受限 | 换个身份继续 | 停止当批，确定影响范围，恢复后用原目标复验 | [链路 K](references/problem-routing.md#链路-k频控验证或账号受限) |
+| 单条耗时不符合预期 | 接口慢 | 拆开调度、初始化、出值、网络 | [链路 J](references/problem-routing.md#链路-j慢) |
+| 要持续跟踪参数或版本 | 记一份结论就够 | 分开记录版本身份，结论带范围 | [参数跟踪](references/version-tracking.md) |
 
-MCP v1.7.0 能力（调用前通过当前工具 schema 确认）：
+## 路线选择
 
-- `compare_network_requests(request_ids=[...])` 比较 2–10 个已捕获请求，返回变化字段、常量字段、值摘要和完整值哈希。摘要 sha256/length 针对规范化 JSON；对照 HTTP 正文哈希时使用 `body.raw` 项的 `raw_utf8.sha256/bytes`。保留重复 query 值及顺序、`query.raw` 和 `body.raw`；JSON 投影只供解释。不要把变化字段直接认定为签名算法。
-- `save_response_body(request_id=..., save_path=...)` 将已捕获的 JS/WASM/JSON/二进制保存到新文件，返回 SHA-256 与字节数。它不会重新请求；默认拒绝残缺正文。先检查 body_state，需要时增加采集上限并有意重采。
-- 网络列表旧 `size` 是字符数，`body_bytes` 才是保存的正文实体字节数；详情 `response_body_total_bytes` 也是解压后的实体字节，不直接与压缩 Content-Length 比较。
-- 大段源码/二进制优先保存后本地分析；模型只读摘要、相关片段和验证结果。WASM 需校验文件哈希、imports/exports 和真实调用，不能仅凭文件名/截图判定成功。
+**诊断从重到轻，交付从轻到重。** 诊断时先用最接近真实的路径证明此刻做得成，再一次拿掉一个依赖，第一个让结果变坏的依赖就是问题所在。交付时选能成立的依赖最少的路线。
 
-使用旧 MCP 时先查看已安装工具定义，不传新参数；保留原有 `network_capture/list_network_requests/get_network_request` 调用方式即可。
+| 路线 | 做法 | 上移的信号 |
+|---|---|---|
+| R0 不生成 | 接口不校验这一项，直接不发 | 换接口或换日期复验失败 |
+| R1 纯算法 | Node/Python 库复现 | 算法依赖闭包状态或环境 |
+| R2 片段执行 | 提取函数放进 vm/execjs | 依赖 DOM、存储或大量全局状态 |
+| R3 补环境 | jsdom/vm 运行 SDK，按读值补齐 | 补丁不收敛，或静态值对齐后仍被拒 |
+| R4 浏览器级运行时 | 真实引擎运行原始 SDK | 所需状态只存在于真实长驻页面 |
+| R5 页面出值、本地发送 | 页面生成未使用的值，本地 HTTP 发送 | 传输确实绑定页面 |
+| R6 页面内请求 | 请求由页面自身发出，需用户接受此依赖 | 无 |
 
-## 遇到签名、混淆或 JSVMP 时
+不必为了还原算法而还原，目标是取得可用的值。R4、R5 仍依赖外部提供会话，不能写成“无浏览器”。详见 [路线阶梯](references/problem-routing.md#路线阶梯)、[原始 SDK 运行](references/original-sdk-runtime.md)、[签名来源隔离](references/signature-source-isolation.md)。
 
-1. 识别变化输入：URL 编码、参数排序、Body 原文、时间戳、随机数、Cookie、设备与登录状态。先收集成功与失败样本，再下结论。
-2. 读 [深度分析流程](references/phase-details.md) 的当前阶段。标准算法优先用 Node/Python 库复现；WASM 先检查 imports/exports；混淆 JS 先定位输入输出与实际调用点。
-3. JSVMP 依据证据选择 [路径 A：算法追踪](references/path-a-four-tools.md) 或 [路径 B：环境复现](references/path-b-env-emulation.md)。SDK 与环境强绑定时先确认签名入口再补环境，避免先堆大量补丁。
-4. 首次观察反爬挑战时尽量不加 Hook，先看响应链。签名对环境敏感时优先源码插桩或较少侵入的模式，用受控对比确认观测是否改变行为；案例里的站点分类只是定位线索。
-5. 源码日志由 `instrumentation(action="log")` 从主世界读取，iframe SDK需指定相同Frame；现代语法需要本地Node/随包Acorn，保守降级可能原样跳过。源码 `files_rewritten>0` 只说明完成改写，继续检查 runtime 标记、实际日志与当前响应，不能当作脚本已经执行。反混淆/常量折叠先生成独立候选并按 [改写验证](references/transform-validation.md) 比较行为，不能把可读视图当等价代码。
-6. 最终代码按“原始输入 → 拼接 → 时间/随机值 → 中间值 → 最终签名”定位首个偏差。无法完成时记录事实、已尝试路径与剩余依赖，不伪造签名或成功响应。
+## 在线实验的纪律
 
-场景配方见 [analysis-scenarios.md](references/analysis-scenarios.md)，常见误判见 [common-pitfalls.md](references/common-pitfalls.md)。
+在线请求会消耗账号额度、一次性值和风控状态，所以用尽量少的请求排除假设。完整方法见 [对照实验](references/controlled-experiments.md)。
 
-## 主世界、Frame 与 Hook 生命周期
+- **先有控制组**。真实路径此刻成立，候选的结果才有意义。控制组失败时停止归因，不写“候选失败”。
+- **发送前过门禁**。版本一致、凭据余量够、值未用过、输入成套，不满足就不发。
+- **单变量要回读**。用实际发出的请求核对只改了声称的变量，再写结论，脚本意图不算数。
+- **单变量没翻转不等于无关**。可能两道闸门并联，用交叉矩阵确认后才能排除。
+- **测量手段先过对照**。工具没看到差异，要先证明它看得见。
+- **结果分类不合并**。`not_sent`、`transport_error`、`rejected`、`accepted`、`target_ok` 分开记录，超时不是拒绝，未发送不是失败。
+- **遇拒绝停止当批**。继续前要能说清这次和上次差在哪、预期是什么，不用重试或加速碰运气。
+- **结论带范围和强度**。写明接口、版本、日期，用观察、支持、排除、证明表达强度。避免“唯一”“必须”“硬墙”。
+- **组合成功不等于单项根因**。要归因到某一项需要消融，业务不需要时可以不做，但不能那样写。
+- **写错了就纠偏**。原始证据不动，在结论处加日期化说明，并写清哪些结论不受影响。
 
-- 默认 `evaluate_js(..., world="isolated")` 保持兼容；读取页面自有全局或 Hook 页面函数时明确传 `world="main"`。
-- 主世界优先 Camoufox `mw:`，不可用时明确标记 `wrappedJSObject` 回退。通道在执行前探测，用户表达式失败后不换通道重放；先核对是否已有副作用。
-- 用 `get_page_info().frames` 取得当前 Frame；优先 `frame_url/frame_name`。`frame_index` 仅对当前快照有效，持久 Hook 禁止使用它。
-- 异步挂载的目标可用 `hook_function(..., persistent=True, world="main")`；`pending` 只表示注册成功，当前未安装，`pending_reason="frame_not_found"` 表示等待未来 Frame。等待有上限，需要时调整 `wait_timeout_ms`。
-- 用相同 world/Frame 的 `get_trace_data` 判断捕获，不要只看 console。日志有界，空结果不能单独证明目标没有运行。
-- `get_trace_data(clear=True)` 只清数据，不卸载 Hook；`remove_hooks()` 要检查 `status/warnings/requires_relaunch`。
-- 锁定属性与已注册初始化脚本可能无法原位卸载，彻底恢复需要新建 BrowserContext 或重启自有浏览器。Attach 模式仅断开再连接不会销毁外部 Context。
-- 完成后关闭本任务拥有的浏览器；Attach 模式保留外部浏览器，不擅自终止他人的工作。
+`scripts/experiment-ledger.py` 提供门禁、台账和回读核对。
 
-## 原生追踪：仅在需要时启用
+## 通用采集
 
-先用 `check_environment()` 查 `available_selectors`，需要时选择定制浏览器并传 `enable_trace=True`，确认返回 `engine_trace.enabled=True`。不修改持久化 active，不覆盖缓存，不自动迁移旧安装。
+普通 JSON API 不必进入逆向流程，先读 [general-collection.md](references/general-collection.md)。
 
-```text
-trace_property_access(action="start")
-# navigate / click / evaluate_js 触发目标行为
-trace_property_access(action="stop", mode="summary", collect_values=True)
-```
-
-- reverse.5 声明 77 个固定 Gecko 原生点；不是任意 JS 属性、VM PC/opcode 或字节码追踪。命中是正证据，未命中不是否定证据。
-- 检查 `possibly_capped/input_truncated`、`coverage.negative_result_is_conclusive`、进程 `acknowledged`。`ack_supported` 不表示当前进程已经确认。
-- 历史文件未知的 hook count/cap 必须保留未知，不能套用当前浏览器的能力。
-- `collect_values=True` 只是追踪结束后的安全快照，不是事件发生时的值；敏感或可能有副作用的路径在 `values_skipped`。query 不采值，避免污染追踪。
-- 高频记录可能改变时序，不能宣称完全不可检测。启用 engine trace 会临时关闭内容 sandbox；普通启动不受影响。
-- 不具备原生追踪时仍可 `compare_env()` + 分批 `evaluate_js`，只补证据支持的环境项，保持 UA 与 API 一致。
+- `templates/python-request/collect.py` 是可运行的通用入口，`utils/collector.py` 可接入自定义签名与鉴权回调，支持去重、JSONL 和断点恢复。核心只用标准库；有依赖限制时配 urllib 回调即可。
+- 空中间页、显式 has_more、临时重复游标、业务重试与页数限制按接口契约启用，默认行为保持兼容。模板不是无需适配的全站方案。
+- 每次请求现算动态签名。凭据来自用户配置、合法登录态或协议刷新过程，不把一次抓取的临时 Cookie 写死到公共模板。
+- 默认重试只用于 GET/HEAD/OPTIONS。POST 等请求发生不确定失败时，先确认幂等条件再重放。
 
 ## 验证、交付与改版
 
-```text
-verify_signer_offline(
-  signer_code="({text}) => ({sign: require('node:crypto').createHash('md5').update(text).digest('hex')})",
-  samples=[{input: {text: "abc"}, expected: {sign: "900150983cd24fb0d6963f7d28e17f72"}}],
-  runtime="node"
-)
-```
-
-- 默认 `runtime="browser"` 保留浏览器样本比对；显式 `node` 才能证明该签名代码不依赖浏览器，并需要 Node.js。可用 `crypto/node:crypto`，完整 jsdom 项目请在自己的项目运行，不塞进单函数验证器。
-- `expected` 与 `compare_params` 必须指向有效断言；异步签名、缺失结果、超时和抛错均须显式检查。Node vm 不是执行不可信代码的安全边界。
-- 离线样本需固定时间/随机输入，或让签名函数显式接收这些值；不要自动改写浏览器全局时间和随机源。
-- 验收按任务类型选择：采集/API 签名任务用代表性新输入、分页/结束/失败路径验证（建议至少 5 次，遵循用户约定并记录实际数量）；WASM/脚本取证验证来源、完整字节、哈希和真实调用；代码维护运行相关回归。不要为了统一清单制造无关请求或额外项目。
-- 模板 `npm test` 与 Python `python test.py` 为离线组件测试，不能替代上述任务验收。24 小时/一周压力测试按业务需要另行约定，未运行不得宣称通过。
-- 交付程序、配置说明、数据样本、验证结果和已知限制。协议模式最终运行不依赖浏览器；站点登录、签名和刷新逻辑必须按实际业务实现，不承诺一个模板适配所有站点。
-- 用 `scripts/project-baseline.py` 记录 SDK/签名代码/脱敏 fixture 的哈希与工具版本，下次改版先 `check` 定位差异。哈希未变不代表接口行为未变，仍需回归。
-- 新发现先记录在需求工作区；通用经验按 [cases/_template.md](cases/_template.md) 脱敏沉淀，标明版本、日期和验证边界。不要把登录态、真实密钥或私有请求样本提交到公共仓库。
+- 验收按任务类型选择：采集和 API 签名任务用代表性新输入、分页、结束和失败路径验证（建议至少 5 次，遵循用户约定并记录实际数量）；WASM 和脚本取证验证来源、完整字节、哈希和真实调用；代码维护运行相关回归。不要为了统一清单制造无关请求或额外项目。
+- 单条通过、离线等价、多目标、连续、续期、跨天分别标状态，未运行的不得宣称通过。模板 `npm test` 与 `python test.py` 是离线组件测试，不能替代任务验收。
+- 交付程序、配置说明、数据样本、验证结果和已知限制。协议模式最终运行不依赖浏览器；依赖外部会话时写清谁提供、谁续期。无法完成时记录事实、已尝试路径与剩余依赖，不伪造签名或成功响应。
+- 收口时写五项：到达层级、当前路线与外部依赖、适用范围、结论强度、失效条件。格式见 [收口格式](references/problem-routing.md#收口格式)。
+- 用 `scripts/project-baseline.py` 记录 SDK、签名代码和脱敏 fixture 的哈希与版本身份，改版时先 `check` 定位差异。哈希未变不代表接口行为未变，仍需回归。
+- 新发现先记录在需求工作区。一条经验只有在不依赖站点时才进入 `references/`：能在不同体系上成立，或能用公开样本复现。否则按 [cases/_template.md](cases/_template.md) 脱敏留在案例里，标明版本、日期和验证边界。不把登录态、真实密钥或私有请求样本提交到公共仓库。
 
 ## 按需参考
 
 | 当前需要 | 参考 |
 |---|---|
-| 维护 Skill/MCP 的独立 Agent 评测 | [agent-validation.md](references/agent-validation.md) |
+| 完整链路、路线阶梯、收口格式 | [problem-routing.md](references/problem-routing.md) |
+| 实验设计、门禁、归因 | [controlled-experiments.md](references/controlled-experiments.md) |
+| 未使用的值、绑定、新鲜度 | [signature-source-isolation.md](references/signature-source-isolation.md) |
+| 运行原始 SDK、状态回放、生命周期 | [original-sdk-runtime.md](references/original-sdk-runtime.md) |
+| 令牌信封与版式 | [opaque-token-analysis.md](references/opaque-token-analysis.md) |
+| 版本身份、结论范围、归档 | [version-tracking.md](references/version-tracking.md) |
+| 浏览器抓包、Hook、插桩、原生追踪的证据边界 | [browser-evidence-contract.md](references/browser-evidence-contract.md) |
 | 首检复用与状态失效重查 | [task-preflight.md](references/task-preflight.md) |
 | 通用采集、恢复、自定义签名与基线 | [general-collection.md](references/general-collection.md) |
 | 工具参数和兼容边界 | [mcp-tool-reference.md](references/mcp-tool-reference.md) |
-| 深度分析当前阶段 | [phase-details.md](references/phase-details.md) |
-| GitHub真实VM/CFF/加解密/风控/指纹实战 | [real-source-cases.md](references/real-source-cases.md) |
-| JSVMP 路径 A / B | [path-a-four-tools.md](references/path-a-four-tools.md) / [path-b-env-emulation.md](references/path-b-env-emulation.md) |
+| 深度分析阶段 | [phase-details.md](references/phase-details.md) |
+| JSVMP 路径 A / B、源码插桩 | [path-a-four-tools.md](references/path-a-four-tools.md) / [path-b-env-emulation.md](references/path-b-env-emulation.md) / [jsvmp-source-instrumentation.md](references/jsvmp-source-instrumentation.md) |
 | 环境补丁与 UA 一致性 | [jsdom-env-patches.md](references/jsdom-env-patches.md) |
-| 反混淆/改写的语义验证 | [transform-validation.md](references/transform-validation.md) |
-| 源码级插桩 | [jsvmp-source-instrumentation.md](references/jsvmp-source-instrumentation.md) |
-| 具体场景与常见误判 | [analysis-scenarios.md](references/analysis-scenarios.md) / [common-pitfalls.md](references/common-pitfalls.md) |
+| 反混淆改写的语义验证 | [transform-validation.md](references/transform-validation.md) |
+| 传输层与协议问题 | [protocol-analysis.md](references/protocol-analysis.md) |
+| 具体场景与常见误判 | [analysis-scenarios.md](references/analysis-scenarios.md) / [common-pitfalls.md](references/common-pitfalls.md) / [troubleshooting.md](references/troubleshooting.md) |
+| 公开样本的本地实战 | [real-source-cases.md](references/real-source-cases.md) |
+| 维护 Skill/MCP 的独立 Agent 评测 | [agent-validation.md](references/agent-validation.md) |
 
 ## 更新记录
 
+- v3.10.0（2026-11-05）：主干改为问题路由与路线阶梯；新增对照实验、签名来源隔离、原始 SDK 运行、不透明令牌、参数跟踪方法与配套脚本；吸收公开 skill 库的并联闸门、概率门、A/A 对照等方法；工具级细节移入取证契约；清理把单站经验写成全局规则的内容和已失效的工具名。
 - v3.9.0（2026-09-08）：真实开源 VM/CFF/CryptoJS/FingerprintJS 本地案例；公开准备与 MCP 验证脚本；吸收多轮实操的主世界日志、保守插桩、精确字符串、异常 Hook 和原生快照归属经验。
-
 - v3.8.0（2026-09-08）：任务级首检与失效重查；响应文件/请求差异证据；按多轮独立 Agent 反馈完善诊断、哈希单位和分页恢复。
-
-- v3.7.0（2026-09-07）：对齐 MCP v1.6.0；通用分页采集、断点恢复与基线记录；修复模板和工具契约，核心指令按需加载。
 - 历史版本与详细差异见 Git tags / Releases。保留现有 Skill 名称和模板目录，避免已有安装与引用失效。

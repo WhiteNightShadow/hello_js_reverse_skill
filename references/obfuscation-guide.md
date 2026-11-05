@@ -68,7 +68,7 @@ new Function('return ' + decryptedCode)()
 
 **MCP 辅助**：
 ```
-[camoufox-reverse] add_init_script(script="eval/Function Hook")
+[camoufox-reverse] hook_function(function_path="eval", hook_code="console.log(arguments[0])", position="before", persistent=True)
 [camoufox-reverse] get_console_logs → 读取解包后的代码
 ```
 
@@ -141,7 +141,7 @@ $=~[];$={___:++$,$$$$:(![]+"")[$],...
 ```
 [camoufox-reverse] inject_hook_preset(preset="xhr") → 一键 Hook XHR 请求
 [camoufox-reverse] get_request_initiator(request_id=N) → 获取请求的 JS 调用栈（黄金路径）
-[camoufox-reverse] add_init_script → 注入全局 Hook
+[camoufox-reverse] hook_function(..., persistent=True) → 注入全局 Hook
 ```
 
 ## 通用反混淆 Node.js 工具

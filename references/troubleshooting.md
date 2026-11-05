@@ -2,9 +2,17 @@
 
 ## 请求失败排查流程
 
-### 排查顺序（必须按序执行）
+### 步骤 0：确认这是一次有效的失败
 
-当协议脚本请求返回非预期结果时，**禁止盲目大改**，按以下 6 步逐项排查：
+动手之前先回答三个问题，否则后面的排查都建立在错误事实上：
+
+1. 请求真的发出去了吗？未发送、超时和被拒绝是三件事，见 [结果分类](controlled-experiments.md#结果分类)。
+2. 控制组此刻成立吗？页面自身路径也失败时，先恢复基线。
+3. 实验是否跨过了凭据到期点？跨过了这次失败就不能归因。
+
+### 排查顺序
+
+当协议脚本请求返回非预期结果时，不要盲目大改，按代价从低到高逐项排查。这是默认顺序，已有证据时可以跳过：
 
 ```
 步骤 ① Cookie/Session 失效
@@ -15,7 +23,7 @@
   │   · 检查是否有 HttpOnly Cookie 漏掉（Network 面板看完整 Cookie）
   │
   ├─ MCP 辅助：
-  │   · get_cookies → 获取 Camoufox 中的 Cookie
+  │   · cookies(action='get') → 获取 Camoufox 中的 Cookie
   │   · evaluate_js(expression="document.cookie") → 获取 JS 可见 Cookie
   │
   └─ 常见原因：Cookie 过期、登录态失效、缺少 HttpOnly Cookie
@@ -59,7 +67,7 @@
   │   · sec-ch-ua 等 Client Hints Header
   │   · Accept-Encoding 不支持 br 但发了 br
   │
-  └─ 修复方法：完整复制浏览器 Headers，逐个删减确认必要项
+  └─ 修复方法：完整复制浏览器 Headers，按组删减确认必要项；多发的头也可能导致拒绝
 
 步骤 ⑤ 环境校验
   │
@@ -69,7 +77,7 @@
   │   · 对比有无环境值时的请求结果
   │
   ├─ MCP 辅助：
-  │   · get_fingerprint_info → 查看 Camoufox 指纹
+  │   · compare_env → 查看当前环境基线
   │   · search_code(keyword="navigator|screen|canvas") → 搜索环境检测代码
   │
   └─ 关键原则：先验证是否真正参与服务端校验，再决定是否补全
@@ -164,11 +172,11 @@
 
 | 状态码 | 常见原因 | 排查方向 |
 |--------|---------|---------|
-| 403 Forbidden | Cookie 失效 / Header 缺失 / IP 被封 / TLS 指纹 | 步骤 ①④⑤⑥ |
+| 403 Forbidden | Cookie 失效 / Header 缺失 / 动态值失效 / IP 被封 / TLS 指纹 | 步骤 ①④⑤⑥，再按 [链路 C](problem-routing.md#链路-c浏览器能过本地同样的头不过) |
 | 412 Precondition Failed | 签名校验失败 / 缺少前置请求 | 签名对比 + 步骤 ② |
 | 429 Too Many Requests | 频率限制 | 步骤 ⑥ |
 | 500 Internal Server Error | 参数格式错误 / 数据类型不匹配 | 检查请求 Body 格式 |
-| 200 但数据为空 | 签名正确但参数错误 / 页码越界 / 缺权限 | 检查业务参数 |
+| 200 但数据为空 | 参数错误 / 页码越界 / 缺权限 / 软拒绝 | 读业务码，对比同期成功样本，见 [链路 B](problem-routing.md#链路-b服务端拒绝) |
 
 ### 加密相关
 
@@ -195,7 +203,7 @@
 
 | 问题 | 原因 | 解决方法 |
 |------|------|---------|
-| `requests` 请求被拒 | TLS 指纹被识别 | 换用 `curl_cffi`（支持浏览器指纹模拟） |
+| `requests` 请求被拒 | 原因不定，可能是动态值、会话或 TLS | 按 [链路 C](problem-routing.md#链路-c浏览器能过本地同样的头不过) 对照后，确认是传输再换 `curl_cffi` |
 | `hashlib.md5()` 报错 | Python 3.9+ FIPS 模式限制 | 使用 `hashlib.md5(usedforsecurity=False)` |
 | `execjs` 执行慢 | 每次创建新的 JS 运行时 | 编译后复用 context：`ctx = execjs.compile(js_code)` |
 | `pycryptodome` 与 `pycrypto` 冲突 | 同时安装了两个库 | `pip uninstall pycrypto && pip install pycryptodome` |
@@ -223,11 +231,13 @@
 |---------|---------|------|
 | 对比请求差异 | `network_capture(action='start')` + `get_network_request` | 在 Camoufox 中捕获真实请求，与脚本请求对比 |
 | 获取真实签名值 | `hook_function(mode='trace')` + `get_trace_data` | 在签名函数设伪断点，捕获真实入参和返回值 |
-| 验证环境检测 | `get_fingerprint_info` + `check_detection` | 确认哪些环境项参与校验 |
+| 验证环境读取 | `compare_env` + `trace_property_access` | 确认 SDK 实际读取了哪些环境项 |
 | 追踪调用链 | `get_request_initiator` | 从请求直接定位到签名函数 |
 | 实时对比 | `evaluate_js` | 在浏览器中执行还原后的签名函数，与脚本输出对比 |
-| **Cookie 归因** [v2.5.0] | `analyze_cookie_sources` | 辨识 Cookie 是 HTTP Set-Cookie 还是 JS document.cookie 写的 |
-| **源码级插桩** [v2.5.0] | `instrument_jsvmp_source` + `get_instrumentation_log` | 对 VMP 做 HTTP 层源码改写，hot_keys 暴露环境指纹集 |
-| **首屏挑战** [v2.5.0] | `navigate(pre_inject_hooks=[...])` | RS/Akamai 412 挑战页 hook 预注入 |
-| **hook 重载** [v2.5.0] | `reload_with_hooks` | 重载使 persistent hook 先于页面 JS 执行 + 清日志 |
-| **运行时探针** [v2.5.0] | `get_runtime_probe_log` | 快速摸底页面在读什么 / 调什么（低开销） |
+| Cookie 归因 | `network_capture` + `inject_hook_preset(preset="cookie")` + `cookies` | 分清 Set-Cookie 与 JS 写入，见 [场景配方](analysis-scenarios.md#cookie-归因分析) |
+| 源码级插桩 | `instrumentation(action='install')` + `instrumentation(action='log')` | 对 VMP 做 HTTP 层源码改写，hot_keys 暴露读取集合 |
+| 首屏挑战 | `navigate(pre_inject_hooks=[...])` | 挑战页 Hook 预注入 |
+| Hook 重载 | `instrumentation(action='reload')` | 重载使持久 Hook 先于页面 JS 执行并清日志 |
+| 运行时探针 | `inject_hook_preset(preset="runtime_probe")` | 摸底页面读取和调用，日志在 `window.__mcp_runtime_log` |
+| 请求差异 | `compare_network_requests` | 比较已捕获请求，变化字段不等于签名算法 |
+| 单变量核对 | `scripts/experiment-ledger.py audit` | 核对两次请求只改了声称的变量 |
