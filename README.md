@@ -13,21 +13,6 @@
 
 入口见 [SKILL.md](SKILL.md) 的问题路由表，完整链路见 [problem-routing.md](references/problem-routing.md)。
 
-## v3.10.0：问题路由与实验纪律
-
-- 主干从“按工具组织”改为“按问题路由”，按现象直接找到第一步和对应链路。
-- 新增对照实验、签名来源隔离、原始 SDK 运行、不透明令牌分析、参数跟踪五份方法文档。
-- 新增 `experiment-ledger.py`（门禁、台账、单变量回读）和 `opaque-token-inspect.py`（令牌批次结构分析）。
-- 清理把单站经验写成全局规则的内容，修正已失效的工具名，并由文档门禁测试防止回退。
-
-见 [v3.10.0](docs/releases/v3.10.0.md)、[公开 skill 库调研](docs/research/2026-11-public-skill-survey.md)。
-
-## v3.9.0：真实开源案例与实操反馈
-
-可重复准备 KProtect VM、javascript-obfuscator CFF、CryptoJS/FingerprintJS，并通过真实 MCP 验证原始/插桩、加解密及原生 trace。见 [v3.9.0](docs/releases/v3.9.0.md)、[实战经验](references/real-source-cases.md)、[准备与复现](scripts/real_cases/README.md)。
-
-更早的版本见下方版本记录。
-
 ## 核心能力
 
 - **问题路由**：按现象定位失败层，给出第一步、对应链路和收口标准
