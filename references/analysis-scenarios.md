@@ -1,6 +1,8 @@
-# 专项场景与工具配方（v3.7.0）
+# 专项场景与工具配方
 
-按场景读取；历史站点现象只能作为候选解释，当前工具参数以 MCP 契约为准。
+目录：[常见签名分析场景速查](#常见签名分析场景速查10-个场景) · [调试环境保护策略（反调试对抗速查表）](#调试环境保护策略反调试对抗速查表) · [工具使用最佳实践](#工具使用最佳实践)
+
+先按 [问题路由](problem-routing.md) 定层，再按场景读取。这里是取证操作的配方，不是诊断结论：场景里的特征只是候选解释，当前工具参数以 MCP 契约为准。
 
 ## 常见签名分析场景速查（10 个场景）
 
@@ -73,19 +75,18 @@ MCP 操作：
 - evaluate_js → 测试 wasm 函数的 I/O
 ```
 
-### 场景 6：TLS 指纹/协议检测
+### 场景 6：疑似 TLS 指纹或协议检测
 
 ```
-特征：算法全对但请求仍失败（token failed / 403）
-原因：服务器通过 TLS Client Hello 或 HTTP 协议版本识别客户端
-解法：
-  a. Camoufox 自带反检测 TLS 指纹，直接使用浏览器自动化验证
-  b. 使用支持自定义 TLS 指纹的库（curl_cffi / got-scraping）
-  c. 使用 HTTP/2 协议
+特征：本地请求失败，浏览器成功
+先排除：一次性值已用过、会话到期、请求形态差异。这些比传输层常见，也更便宜
+确认：把同一个未使用的值分别走干净页面通道、TLS 模拟客户端、普通客户端
+      只有这组对照出现稳定分界，才能说是传输层
+可选客户端：curl_cffi（Python）、got-scraping（Node.js）
 
 MCP 操作：
-- 在 Camoufox 中验证请求成功 → 确认是 TLS 问题
-- 换用 curl_cffi（Python）或 got-scraping（Node.js）
+- 取得未使用的值，见 signature-source-isolation.md
+- 按 protocol-analysis.md 的传输层诊断实验比较
 ```
 
 ### 场景 7：WebSocket 通信
@@ -97,6 +98,8 @@ MCP 操作：
 - inject_hook_preset(preset="websocket") → 一键 Hook WebSocket
 - get_console_logs → 获取 WS 消息日志
 - evaluate_js → 手动发送/接收 WS 消息
+
+握手失败时列全部凭据来源（Cookie、Header、URL），对照运行时实际读写的位置
 ```
 
 ### 场景 8：字体映射还原
@@ -110,54 +113,38 @@ MCP 操作：
 - evaluate_js → 读取页面实际渲染的文字
 ```
 
-### 场景 9：反检测站点分析
+### 场景 9：首屏挑战或验证
 
 ```
-特征：目标站点有 Cloudflare、瑞数、极验等反爬检测
+特征：业务内容出现之前有挑战页、验证或重定向链
 
 MCP 操作：
-- launch_browser(humanize=true) → 启动人性化鼠标移动
-- navigate → 观察 redirect_chain 判断反爬类型
+- navigate → 不加 Hook，先观察 redirect_chain 和最终状态
+- launch_browser(humanize=true) → 需要时启用人性化鼠标移动
 - intercept_request(url_pattern="**/*", action="log") → 监控所有请求
-- inject_hook_preset(preset="debugger_bypass") → 绕过反调试
+- inject_hook_preset(preset="debugger_bypass") → 确有反调试时再用
+是否出现验证由目标站决定，不做本地预判
 ```
 
-### 场景 10：JSVMP + 环境伪装（jsdom/vm 沙箱执行）
+### 场景 10：JSVMP + 环境复现（运行原始 SDK）
 
 ```
-特征：JSVMP 不可拆解，签名算法封装在字节码中，与环境指纹深度绑定
+特征：JSVMP 不可拆解，改变环境值会改变输出
 判断依据：
-  - JSVMP 劫持 XHR/fetch 请求链路
-  - 服务端静默拒绝（HTTP 200 + 空 body）
-  - 改变环境值导致签名变化
+  - 算法封装在字节码里，入口可调用
+  - 改变环境值导致输出变化
+  - 本地值已被来源替换实验定位为问题所在
 
-方法论（路径 B 环境伪装六步法）：
-1. 用 Camoufox + evaluate_js 分批采集真实浏览器环境
-2. 在 jsdom 中运行完全相同的采集代码
-3. 逐项 diff，按影响分级修复（致命级→高危→中危）
-4. 编写 patchEnvironment() 全量修复
-5. 从 jsdom 内部（win.eval）验证所有检测点通过
-6. 端到端验证：生成签名 → 请求接口 → 返回有效数据
+方法：见 original-sdk-runtime.md
+1. 定位入口，确认入参形状
+2. 记录 SDK 实际读取，与当前浏览器快照比较
+3. 先 seed 后 init，按读值证据回放状态
+4. 哨兵实验确认首次读取缓存
+5. 离线检查，再有界在线验收
 
-最关键的 5 项修复：
-- Function.prototype.toString → WeakSet + 源码正则 + 实例覆写
-- navigator.plugins → 完整 PluginArray/Plugin/MimeType 对象树
-- navigator.webdriver → false
-- document.hasFocus() → true
-- DOM offsetHeight/Width → 非零值
-
-MCP 操作：
-- launch_browser → navigate → 搭建采集环境
-- compare_env → 采集浏览器基准数据
-- evaluate_js → 分批采集细粒度环境值（4-5 批次）
-- 本地运行 jsdom 对比脚本 → 生成差异报告
-- 迭代修复 → 再次对比 → 直到差异归零 → 端到端验证
-
-⚠️ 环境伪装关键红线：
-- Firefox UA 严禁补 userAgentData / connection / getBattery / window.chrome / performance.memory
-- Function.prototype.toString 整个 patch 只能覆盖一次
-- env-patch 体量超 800 行触发审查
-- 命中相关案例时，精读案例的"禁动清单"和"UA 分支矩阵"段
+具体补哪些项取决于当前 SDK 的读值，别处的补丁清单只作候选。
+补丁要与声明的 UA 一致，例如 Firefox UA 不补 Chromium 独有对象。
+模板见 jsdom-env-patches.md，路径 B 的步骤见 path-b-env-emulation.md。
 ```
 
 ---
@@ -200,7 +187,7 @@ MCP 操作：
   network_capture(action='start') → 触发请求 → list_network_requests
   → get_request_initiator(request_id=N) → 直达签名函数
 
-环境伪装路径：
+环境复现路径：
   compare_env → evaluate_js(分批采集) → 本地 diff → 补丁 → verify_signer_offline
 
 JSVMP 插桩路径：
@@ -211,7 +198,7 @@ JSVMP 插桩路径：
 Cookie 归因路径：
   network_capture(action='start', capture_body=true)
   → inject_hook_preset(preset="cookie", persistent=true)
-  → 触发场景 → analyze_cookie_sources(name_filter="目标cookie名")
+  → 触发场景 → 按下文「Cookie 归因分析」汇总三个来源
 ```
 
 ### 效率原则
@@ -228,11 +215,13 @@ Cookie 归因路径：
 ```
 源码级插桩判定与后续策略：
 
-| hot_methods 包含 | hot_keys 环境属性数 | 策略 |
+| hot_methods 包含 | hot_keys 环境属性 | 候选策略 |
 |-----------------|---------------------|------|
-| CryptoJS.MD5 / SubtleCrypto.digest / btoa | 少（< 15） | 纯算法还原 |
-| 大量自定义 fn 名 | 少（< 15） | 提取 VMP 子片段 + vm 沙箱 |
-| CryptoJS / SubtleCrypto | 多（40+） | jsdom 环境伪装（路径 B） |
+| CryptoJS.MD5 / SubtleCrypto.digest / btoa | 很少 | 纯算法还原 |
+| 大量自定义 fn 名 | 很少 | 提取 VMP 子片段 + vm 沙箱 |
+| CryptoJS / SubtleCrypto | 很多 | 环境复现（路径 B） |
+
+这张表只是起点，策略以当前读值和实验结果为准。
 ```
 
 ### 使用 inject_hook_preset 一键 Hook
@@ -261,12 +250,12 @@ hook_function(
 ### 使用源码级插桩（通用 VMP 利器）
 
 ```
-# 1. 确认是 VMP（case_count > 50 基本是）
+# 1. 确认是 VMP（分支很多的分发循环是线索，不是判定）
 search_code(keyword='switch', script_url="<VMP脚本URL>", context_chars=500)
 
 # 2. 装插桩
 instrumentation(action='install',
-  url_pattern="**/sdenv-*.js",
+  url_pattern="**/<VMP文件>-*.js",
   mode="ast",
   tag="vmp1",
   rewrite_member_access=true,
@@ -284,19 +273,19 @@ instrumentation(action='log', tag_filter="vmp1", type_filter="tap_method", limit
   → summary.hot_methods 是 VMP 调用的方法 top 30
 
 # 5. 完工移除
-instrumentation(action='stop', url_pattern="**/sdenv-*.js")
+instrumentation(action='stop', url_pattern="**/<VMP文件>-*.js")
 ```
 
 ### 使用 pre_inject_hooks 解决首屏挑战页
 
 ```
-# RS 412 / Akamai 首包检测场景：
+# 首屏挑战场景：
 # 普通 navigate 时 challenge JS 已经跑完了，hook 完全漏掉
 # 正确做法：
 navigate(
   url="https://target.com/",
   wait_until="networkidle",
-  pre_inject_hooks=["xhr", "fetch", "cookie"]
+  pre_inject_hooks=["xhr", "fetch", "cookie_hook"]
 )
 # 返回 initial_status / final_status / redirect_chain
 ```
@@ -304,7 +293,7 @@ navigate(
 ### Cookie 归因分析
 
 ```
-# 搞清楚某个 Cookie 到底是谁写的（JS / HTTP Set-Cookie / 混合）
+# 搞清楚某个 Cookie 是 HTTP Set-Cookie 写的、JS 写的，还是两者配合
 
 # 1. 前置条件：网络抓包 + cookie hook 同时开
 network_capture(action='start', capture_body=true)
@@ -312,33 +301,32 @@ inject_hook_preset(preset="cookie", persistent=true)
 
 # 2. 触发场景（刷新 / 登录 / 点业务按钮）
 
-# 3. 一键归因
-analyze_cookie_sources(name_filter="ttwid")
-# name_filter 是子串；其他名称分别查询，不使用 | 当作正则
-→ 返回：
-  cookies[name].sources: ["http_set_cookie" | "js_document_cookie"]
-  cookies[name].http_responses: [{url, ts, header}]
-  cookies[name].js_writes: [{value, stack, ts}]
+# 3. 汇总三个来源
+list_network_requests + get_network_request   → 响应头里的 set-cookie 及其 URL
+evaluate_js(expression="window.__mcp_cookie_log || []", world="main")  → JS 写入、值和调用栈
+cookies(action='get')                         → 当前 Cookie 罐，含 HttpOnly
 
 # 4. 按归因结果进一步分析
-  a. 纯 http_set_cookie → 看 http_responses[].url 是哪个接口
-  b. 纯 js_document_cookie → 看 js_writes[].stack 定位写入函数
+  a. 只有 HTTP 响应 → 看是哪个接口下发的
+  b. 只有 JS 写入 → 从调用栈定位写入函数
   c. 两者都有 → 两步都做
 ```
+
+MCP v1.8.0 未注册 `analyze_cookie_sources`，以上是手动归因。实际工具清单以当前 schema 为准。
 
 ### hook_jsvmp_interpreter 模式选择
 
 ```
-# proxy 模式（全覆盖，但可被检测）— 仅行为型反爬可用
+# proxy 模式（覆盖广，但会改变被观察对象）
 hook_jsvmp_interpreter(mode='proxy', persistent=true)
 
-# transparent 模式（安全，低覆盖）— 签名型反爬必须用这个
+# transparent 模式（干扰较小，覆盖较低）
 hook_jsvmp_interpreter(mode='transparent', persistent=true)
 
 # 区别：
 # proxy: 装 Proxy 在 navigator/screen/document 等对象上，能看到所有属性读取
 # transparent: 只替换 prototype getter，不装 Proxy，不改 Function.prototype
-# 签名型反爬（RS/Akamai）用 proxy 会破坏签名，必须用 transparent
+# 选择依据：比较原始与观测两次的结果，proxy 改变了结果就换 transparent 或选择性源码插桩
 ```
 
 ### verify_signer_offline 离线验证
@@ -346,10 +334,10 @@ hook_jsvmp_interpreter(mode='transparent', persistent=true)
 ```
 # 用真实样本验证签名代码正确性
 verify_signer_offline(
-  signer_code="(sample) => { return {a_bogus: generateABogus(sample.url)}; }",
+  signer_code="(sample) => { return {sign: generateSign(sample.url)}; }",
   samples=[
-    {id: "req1", input: {url: "..."}, expected: {a_bogus: "DFSz..."}},
-    {id: "req2", input: {url: "..."}, expected: {a_bogus: "EGTa..."}},
+    {id: "req1", input: {url: "..."}, expected: {sign: "<真实样本值>"}},
+    {id: "req2", input: {url: "..."}, expected: {sign: "<真实样本值>"}},
   ]
 )
 → 返回 pass_rate + first_divergence（字符级定位首偏差点）

@@ -2,6 +2,8 @@
 
 本目录汇集历史逆向分析经验与骨架模板，供遇到相关技术特征时按需查阅。案例中的验证结论只适用于其记录的版本、日期和范围；目录存在或关键词命中不代表当前方案已验证。任务首检与续做复用遵循 [任务级检查](../references/task-preflight.md)。
 
+**这是全仓库唯一可以出现站点名、SDK 名和站点参数名的地方。** 案例结论不是全局规则，命中只产生候选假设，走哪条链路由当前目标的证据决定，方法见 [问题路由](../references/problem-routing.md)。下表的关键词由测试自动提取，一旦出现在 `SKILL.md` 或 `references/` 就会失败。
+
 ## 高频站点与特征速查表
 
 > 仅在当前任务遇到相应逆向特征时查表，命中后读相关案例的定位线索与踩坑记录，并用当前源码/样本验证适用性。无需遍历全部案例，也不要求每次工具调用前重复查阅。
@@ -42,6 +44,9 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | [jsvmp-ruishu6-cookie-412-sdenv.md](jsvmp-ruishu6-cookie-412-sdenv.md) | JSVMP RS6 + Cookie 生成 + 412 挑战 + sdenv 补环境 | ★★★★★ | sdenv（魔改 jsdom + C++ V8 Addon）让RS JSVMP 真实执行生成 Cookie | 签名型 |
 | [universal-vmp-source-instrumentation.md](universal-vmp-source-instrumentation.md) | **[v2.5.0 新]** 通用 VMP（RS 5/6、Akamai sensor_data、webmssdk、obfuscator.io）+ 首屏挑战 + 混合 Cookie 模式 | ★★★★ | **源码级插桩** + hot_keys 指纹学习 + analyze_cookie_sources 归因（**骨架模板**，由使用者按实际站点填充） | 混合（以签名型为主） |
 | [jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox.md](jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox.md) | **[v2.7.0 新]** JSVMP 双签名（X-Bogus + X-Gnarly）+ XHR/fetch 双通道拦截 + cacheOpts 初始化 + jsdom Firefox 环境伪装 | ★★★★★ | jsdom 喂入-截出策略 + Firefox 格式 native code 伪装 + cacheOpts 路径注册 + got-scraping TLS 指纹模拟 | 行为型 |
+| [multi-surface-sdk-source-isolation.md](multi-surface-sdk-source-isolation.md) | **[v3.10 新，已脱敏]** 同平台多端 SDK、软拒绝、来源隔离、原始 SDK 运行、结论纠偏 | ★★★★★ | 按端分别定路线：R0、R4 最小状态、R4 完整回放 | 不分类 |
+
+[historical-experience-rules.md](historical-experience-rules.md) 是 v3.10 之前的 30 条经验法则原文，含大量单站结论，只作历史追溯，每条的现状见 [旧规则去向](../references/experience-rules-full.md)。
 
 ## 特征匹配快速参考
 
@@ -90,6 +95,8 @@ RS JSVMP + Cookie 签名
 ```
 
 ## 按需沉淀新案例
+
+先判断它是案例还是方法：一条经验只有在不依赖站点时才进入 `references/`，也就是能在不同体系上成立，或能用公开样本复现。只在一个站点上见过的，哪怕验证过很多次，也留在案例里。提升时把站点名、参数名、阈值和耗时都去掉，写成判断顺序和收口标准。
 
 1. 复制 `_template.md` 为新文件，以技术特征命名
 2. 按模板填写，注明来源、版本、日期、实际验证范围与尚未验证项；不把骨架模板标作已验证方案

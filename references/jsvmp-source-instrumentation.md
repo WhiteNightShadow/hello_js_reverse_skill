@@ -1,6 +1,8 @@
 # JSVMP 源码级插桩专项指南（第四板斧）
 
-> **Skill v3.9.0 / MCP v1.8.0**。当前执行接口以 `instrumentation(action=...)` 为准；旧版 MCP 调用前检查实际工具 schema。
+目录：[1. 为什么需要源码级插桩](#1-为什么需要源码级插桩) · [2. 两种改写模式：regex vs AST](#2-两种改写模式regex-vs-ast) · [改写状态与运行时健康诊断](#改写状态与运行时健康诊断) · [3. 按需操作骨架](#3-按需操作骨架8-步) · [4. 进阶技巧](#4-进阶技巧) · [5. 常见问题与陷阱](#5-常见问题与陷阱) · [6. 源码级插桩的还原决策](#6-源码级插桩的还原决策) · [7. 参考](#7-参考)
+
+> **Skill v3.10.0 / MCP v1.8.0**。当前执行接口以 `instrumentation(action=...)` 为准；旧版 MCP 调用前检查实际工具 schema。
 >
 > 与 `jsvmp-analysis.md` 的第一/二/三板斧互补——前三板斧诊断"VM 看外界 / 外界看 VM"，本文档讲解"VM 看自己"。
 
@@ -149,7 +151,7 @@ instrumentation(action="log", tag_filter="vmp1", limit=10)
 Actions:
   # 新浏览器分析任务先 check_environment()；同任务已有环境则复用
   launch_browser(headless=False)   # 需要新建本任务浏览器时执行
-  network_capture(action='start', capture_body=True)   # 抓响应体，后续 analyze_cookie_sources 需要
+  network_capture(action='start', capture_body=True)   # 抓响应头和正文，Cookie 归因需要
 ```
 
 ### Step 2 — 第一次导航定位 VMP 脚本 URL
@@ -178,7 +180,7 @@ Actions:
 Actions:
   instrumentation(
     action="install",
-    url_pattern="**/sdenv-*.js",       # glob 模式，匹配所有 CDN hash 变种
+    url_pattern="**/<VMP文件>-*.js",   # glob 模式，匹配所有 CDN hash 变种
     mode="ast",                         # 本地解析，不依赖页面联网
     tag="vmp1",                         # 一次插桩多 VMP 时区分
     rewrite_member_access=True,
@@ -207,11 +209,10 @@ Actions:
   → 检查 final_status / redirect_chain、业务完成信号和运行时健康状态
   → HTTP 200 仍需业务验证；403/412 不能单独确定厂商或失败原因
 
-特殊场景：若目标就是首屏挑战页（RS 412），用：
+特殊场景：若目标就是首屏挑战页，用：
   navigate(
     url="https://target.com/",
-    pre_inject_hooks=["xhr", "fetch", "cookie"],  # 只放本次已选择的探针
-    via_blank=True,
+    pre_inject_hooks=["xhr", "fetch", "cookie_hook"],  # 只放本次已选择的探针
     wait_until="networkidle"
   )
 ```
@@ -299,14 +300,14 @@ SDK 在 iframe 中时，上述 `log` 调用都需加相同的 Frame 选择器，
 ### 4.1 多 VMP 场景（一次分析两个脚本）
 
 ```
-instrumentation(action="install", url_pattern="**/webmssdk.es5.js", mode="ast", tag="webmssdk",
+instrumentation(action="install", url_pattern="**/sdk-a.js", mode="ast", tag="sdk-a",
                 rewrite_calls=False, filter_property_names=["userAgent"])
-instrumentation(action="install", url_pattern="**/a_bogus.js", mode="ast", tag="bogus",
+instrumentation(action="install", url_pattern="**/sdk-b.js", mode="ast", tag="sdk-b",
                 rewrite_calls=False, filter_property_names=["userAgent"])
 
 # 分别看
-instrumentation(action="log", tag_filter="webmssdk", type_filter="tap_get")
-instrumentation(action="log", tag_filter="bogus", type_filter="tap_get")
+instrumentation(action="log", tag_filter="sdk-a", type_filter="tap_get")
+instrumentation(action="log", tag_filter="sdk-b", type_filter="tap_get")
 ```
 
 ### 4.2 key_filter 锁定某个具体属性
@@ -328,7 +329,7 @@ instrumentation(action="log", tag_filter="vmp1", type_filter="tap_method", key_f
 instrumentation(action="status")
 
 # 停止单个
-instrumentation(action="stop", url_pattern="**/sdenv-*.js")
+instrumentation(action="stop", url_pattern="**/<VMP文件>-*.js")
 
 # 全部停止
 instrumentation(action="stop")  # 仅在全部 route 都属于本任务且需清理时
@@ -341,18 +342,17 @@ instrumentation(action="stop")  # 仅在全部 route 都属于本任务且需清
 runtime_probe 不改写源码，通过 JS 包装热点 API；它不是 Gecko 原生 trace，也不能保证低开销或不可检测。两者按需配合：
 
 - VMP 内部被选中的 `obj[key]` 读取 → `instrumentation(action="log")`
-- VMP 最终落到 `XMLHttpRequest.open` / `canvas.toDataURL` / `navigator.userAgent` 的 getter 调用 → `get_runtime_probe_log`
+- VMP 最终落到 `XMLHttpRequest.open` / `canvas.toDataURL` / `navigator.userAgent` 的 getter 调用 → 运行时探针日志 `window.__mcp_runtime_log`
 
 ```
 inject_hook_preset(preset="runtime_probe", persistent=True)
-instrumentation(action="install", url_pattern="**/sdenv-*.js", mode="ast", tag="vmp1",
+instrumentation(action="install", url_pattern="**/<VMP文件>-*.js", mode="ast", tag="vmp1",
                 rewrite_calls=False, filter_property_names=["userAgent"])
 instrumentation(action="reload")
 触发操作
 # 两路都读
 instrumentation(action="log", tag_filter="vmp1", limit=300)
-get_runtime_probe_log(type_filter="xhr_send", limit=100)
-get_runtime_probe_log(type_filter="canvas_toDataURL", limit=50)
+evaluate_js(expression="window.__mcp_runtime_log || []", world="main")  # 本地按 type 过滤
 ```
 
 ---
@@ -407,7 +407,7 @@ get_runtime_probe_log(type_filter="canvas_toDataURL", limit=50)
 
 摘要只覆盖所选位置与已保存的事件，下表的数量是历史启发，不是固定判据。`hot_methods` 的 `typeof.method` 不能直接标识 CryptoJS 等库；先结合源码、I/O 和当前业务对照验证，再选择策略：
 
-| 结合源码/I/O 确认的调用特征 | hot_keys 环境属性数 | cookie 来源（analyze_cookie_sources） | 候选策略 |
+| 结合源码/I/O 确认的调用特征 | hot_keys 环境属性数 | cookie 来源（Cookie 归因） | 候选策略 |
 |-----------------|---------------------|--------------------------------------|------|
 | 已证实使用 CryptoJS.MD5 / SubtleCrypto.digest / HMAC | 少（< 10） | 全部 js_document_cookie | 核对输入与拼接后尝试纯算法还原（crypto/hashlib） |
 | 已证实使用 CryptoJS，且输入依赖环境 | 中（10-30） | 混合或 js_document_cookie | 提取 JS 签名函数 + vm/execjs 沙箱并验证 |

@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: single-variable-claim-audit
+expected_outcome: |
+  回答指出不是单变量，收窄结论强度，保留 B 的正结果，用纠偏方式修改文档。

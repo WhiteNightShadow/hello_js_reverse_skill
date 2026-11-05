@@ -1,5 +1,7 @@
 # 环境补全指南
 
+目录：[概述](#概述) · [原则](#原则) · [1. Node.js vm 沙箱最小环境](#1-nodejs-vm-沙箱最小环境) · [2. WASM 环境补全](#2-wasm-环境补全) · [3. jQuery 模拟](#3-jquery-模拟) · [4. XMLHttpRequest 模拟](#4-xmlhttprequest-模拟) · [5. 环境检测绕过清单](#5-环境检测绕过清单) · [6. 完整环境补全模板（jsdom）](#6-完整环境补全模板jsdom) · [MCP 辅助确定环境需求](#mcp-辅助确定环境需求)
+
 ## 概述
 
 将浏览器端 JS 代码移植到 Node.js 执行时，需要模拟浏览器环境。本指南提供各种场景下的
@@ -10,6 +12,7 @@
 1. **最小补全优先**：只补目标代码实际访问的 API，不要一次性补全所有浏览器 API
 2. **按需扩展**：运行报错时再补对应的属性/方法
 3. **真实值优先**：尽量使用真实浏览器采集的值，而非随意伪造
+4. **跑通不等于可用**：补到不报错只到 S1，服务端是否接受要走 [问题路由](problem-routing.md#链路-b服务端拒绝)。补丁持续不收敛时考虑 [浏览器级运行时](original-sdk-runtime.md#选运行时)
 
 ## 1. Node.js vm 沙箱最小环境
 
@@ -390,9 +393,9 @@ function createFullBrowserEnv(options = {}) {
 1. [camoufox-reverse] search_code(keyword="window|document|navigator|location|screen")
    → 先在已加载脚本中识别代码访问了哪些浏览器 API
 
-2. [camoufox-reverse] add_init_script(script="记录被访问的全局变量和属性")
+2. [camoufox-reverse] inject_hook_preset(preset="runtime_probe", persistent=True)
    + reload()
-   + get_console_logs
+   + evaluate_js(expression="window.__mcp_runtime_log || []", world="main")
    → 确定运行时真正访问了哪些环境字段
 
 3. [camoufox-reverse] hook_function(mode='trace', function_path="环境检测函数路径")

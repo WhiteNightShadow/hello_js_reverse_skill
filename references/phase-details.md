@@ -1,6 +1,10 @@
-# 深度分析流程（v3.7.0）
+# 深度分析流程
 
-仅在遇到接口签名、混淆、JSVMP 或环境依赖时按当前阶段读取。普通 JSON API 采集先读 [general-collection.md](general-collection.md)，无需逐项执行逆向流程。行为约定与验收以 [SKILL.md](../SKILL.md) 为准。
+目录：[Phase 0：任务理解与调试环境搭建](#phase-0任务理解与调试环境搭建) · [Phase 0.5：按需查阅相关经验](#phase-05按需查阅相关经验) · [Phase 1：目标侦察（自动执行）](#phase-1目标侦察自动执行) · [Phase 2：源码分析](#phase-2源码分析) · [Phase 3：动态验证](#phase-3动态验证) · [Phase 4：算法还原（Node.js / Python）](#phase-4算法还原nodejs--python) · [Phase 5：验证与交付](#phase-5验证与交付)
+
+仅在 [问题路由](problem-routing.md) 指向深度分析时按当前阶段读取。普通 JSON API 采集先读 [general-collection.md](general-collection.md)，无需逐项执行逆向流程。行为约定与验收以 [SKILL.md](../SKILL.md) 为准。
+
+本文的阶段是操作清单，不是判断依据。走哪条路由当前证据决定；文中的特征、步骤都是候选，换目标后要重新验证。
 
 ### Phase 0：任务理解与调试环境搭建
 
@@ -83,27 +87,9 @@ readFile("cases/<命中的 case>.md")  # 读取方案方向 + 踩坑记录 + 站
 
 #### 0.5.2 未命中任何 case 的行为
 
-30 秒指纹采集，然后走标准 Phase 1-5 流程：
+案例命中与否都不改变流程，继续走 Phase 1-5。需要候选线索时，到 [cases/README.md](../cases/README.md) 的关键词索引查，用 `search_code(keyword="<索引里的关键词>")` 核对当前页面是否出现。
 
-```
-# 反爬 SDK / 系统特征
-search_code(keyword="webmssdk")         # webmssdk 家族
-search_code(keyword="byted_acrawler")   # webmssdk 家族
-search_code(keyword="_sdkGlueInit")     # 抖音特征
-search_code(keyword="cacheOpts")        # TikTok 特征
-search_code(keyword="sdenv")            # 瑞数 RS 特征
-search_code(keyword="FSSBBIl1UgzbN7N")  # RS cookie 特征
-
-# 签名参数特征
-search_code(keyword="a_bogus")          # 抖音
-search_code(keyword="X-Bogus")          # TikTok 国际版
-search_code(keyword="X-Gnarly")         # TikTok 国际版
-search_code(keyword="acw_sc__v2")       # Aliyun WAF
-```
-
-没有命中时先保留需求工作区的分析记录；发现新的通用经验时沉淀：
-1. 按 `cases/_template.md` 格式建立 `cases/<新案例>.md`
-2. 更新 `cases/README.md` 的"高频站点速查表"追加一行
+没有命中时先保留需求工作区的分析记录。沉淀规则见 [cases/README.md](../cases/README.md#按需沉淀新案例)。
 
 ### Phase 1：目标侦察（自动执行）
 
@@ -201,30 +187,30 @@ Actions:
 | OB 混淆 (obfuscator.io) | `_0x` 前缀变量、十六进制字符串数组 | 字符串解密 + 变量重命名 |
 | 控制流平坦化 (CFF) | `switch-case` 状态机、`while(true)` 循环 | 追踪状态转移还原执行顺序 |
 | eval/Function 打包 | `eval(...)` 或 `new Function(...)` 包裹 | Hook eval/Function 拦截源码 |
-| JSVMP | 200KB+ 文件、自定义解释器 | **不反编译**，走路径 A 或路径 B |
+| JSVMP | 大文件、自定义解释器 | 默认不从反编译入手，走路径 A 或路径 B |
 
 #### 2.2+ JSVMP 专项分析（核心能力）
 
-当识别到 JSVMP（JS 虚拟机保护）时，**严禁尝试反编译字节码**。
+当识别到 JSVMP（JS 虚拟机保护）时，默认不从反编译字节码入手：成本高，而且通常不是取得可用值的必要条件。证据表明确实需要时再做。
 
 **识别标志**：
-- 超大 JS 文件（200KB+），函数/变量名完全无意义
+- 异常大的 JS 文件，函数/变量名完全无意义
 - 包含自定义解释器循环：`while(true) { switch(opcode) { ... } }`
 - 改写或劫持浏览器原生 API（XHR / fetch / Cookie）
 - 超大数组（字节码）+ 指针变量 + 栈操作 + 跳转指令
 
 **路径选择决策**：
 
-| 路径 | 目标 | 方法 | 适用场景 | 典型用时 |
-|---|---|---|---|---|
-| A：算法追踪 | 搞清 JSVMP 内部算法，用纯代码还原 | 四板斧（Hook/插桩/日志/源码级插桩） | JSVMP 算法可提取、环境依赖少 | 4-8 小时 |
-| B：环境伪装 | 在 jsdom/vm 中运行原始 JSVMP | 环境采集 → 对比 → 补丁 | JSVMP 与环境深度绑定、算法不可提取 | 2-4 小时 |
+| 路径 | 目标 | 方法 | 适用场景 |
+|---|---|---|---|
+| A：算法追踪 | 搞清 JSVMP 内部算法，用纯代码还原 | 四板斧（Hook/插桩/日志/源码级插桩） | JSVMP 算法可提取、环境依赖少 |
+| B：环境复现 | 在 jsdom/vm 或浏览器级运行时中运行原始 JSVMP | 读值证据 → 状态回放 → 验证 | JSVMP 与环境深度绑定、算法不可提取 |
 
 ```
 决策树：
 ├─ JSVMP 是否劫持了请求链路（XHR/fetch 拦截器）？
-│   ├─ YES + 算法与环境指纹深度绑定（如 a_bogus）
-│   │   → 优先选路径 B（环境伪装）
+│   ├─ YES + 改变环境值会改变输出
+│   │   → 优先选路径 B（环境复现）
 │   │   → 路径 B 失败时回退路径 A
 │   └─ YES 但签名逻辑相对独立
 │       → 路径 A（算法追踪），提取签名函数
@@ -233,28 +219,26 @@ Actions:
 │   ├─ Hook 确认使用标准算法 → 路径 A，纯算法还原
 │   └─ 算法完全自定义 + 环境依赖重 → 路径 B
 │
-└─ 无法判断 → 先快速测试路径 B（30 分钟），不行再走路径 A
+└─ 无法判断 → 先做时间盒内的路径 B 试探，不收敛再走路径 A
 ```
 
-**反爬类型前置判断**：
+**位置前置判断**：
 
 ```
-先判断 JSVMP 所在反爬类型：
+navigate(url) 不加任何 hook，看响应链和后续请求：
 
-┌─ navigate(url) 不加任何 hook，看 redirect_chain
+├─ 业务页之前有挑战响应链
+│   → 值可能在加载阶段就参与校验，观测容易改变行为
+│   → 优先低干扰观测，比较原始与观测两次的结果
 │
-├─ redirect_chain 反复 412 然后才到 200
-│   → 签名型 JSVMP
-│   → 路径 A 只能走第四板斧（源码级插桩）
-│   → 前三板斧禁用（会破坏签名）
+├─ 首屏正常，业务请求带动态参数
+│   → 按需组合 Hook、插桩和环境复现
 │
-├─ redirect_chain 直接 200 但页面后续 XHR 带签名参数
-│   → 行为型 JSVMP
-│   → 路径 A 四板斧全开
-│
-└─ redirect_chain 直接 200 无特殊签名参数
-    → 不是签名型也不是 JSVMP，走混淆还原
+└─ 首屏正常，也没有动态参数
+    → 走混淆还原或普通采集
 ```
+
+这只是选观测手段的线索，状态码和响应链都不能判定厂商或工具禁用规则。
 
 **路径 A：算法追踪（四板斧详细步骤）**
 
@@ -306,7 +290,7 @@ Actions:
 | 签名逻辑完全定制化 | 提取最小 JS 片段执行 | Node.js `vm` 沙箱 / Python `execjs` |
 | VM 劫持了整个请求链路 | 提取 VM 核心 + 最小环境 | 加载完整 VM 文件但只调用签名入口 |
 
-**路径 B：环境伪装（六步法详细步骤）**
+**路径 B：环境复现（六步法详细步骤）**
 
 ```
 步骤 1：用 Camoufox 采集真实浏览器完整环境指纹
@@ -328,22 +312,17 @@ Actions:
   });
   const win = dom.window;
 
-步骤 3：逐项 diff，按检测影响分级
-  致命级 — 缺失即被服务端拒绝：
-  · Function.prototype.toString 暴露 jsdom 实现代码
-  · navigator.plugins.length = 0（真实浏览器 = 5）
-  · navigator.webdriver = undefined（应为 false）
-  · document.hasFocus() = false（应为 true）
-  · DOM offsetHeight/Width = 0（应为非零值）
-  高危级 — 可能参与指纹哈希：
-  · Object.prototype.toString 标签错误
-  · window.chrome 对象缺失（仅 Chrome UA）
-  · performance.timing/navigation 缺失
-  · Symbol.toStringTag 不正确
-  中危级 — API 存在性检测（30+ 缺失 API）
+步骤 3：做读值差异，不做全量 diff
+  只比 SDK 实际读取的项，基线值以当前浏览器快照为准。下面是常见候选，不是服务端规则：
+  · Function.prototype.toString、Object.prototype.toString 标签、Symbol.toStringTag
+  · navigator.plugins、navigator.webdriver
+  · document.hasFocus()、DOM 布局尺寸
+  · performance 条目、窗口几何
+  · 基线浏览器才有的全局对象（按 UA 判断，例如 window.chrome 只属于 Chromium）
+  方法见 original-sdk-runtime.md「读值差异」
 
-步骤 4：编写 patchEnvironment() 全量修复
-  核心修复模块（按优先级排序）：
+步骤 4：编写 patchEnvironment()，只补有读值证据的项
+  可能用到的修复模块：
   ① markNative 三层防御（WeakSet + 源码正则 + 实例覆写 + 50+ 原型链扫描）
   ② navigator 补丁（plugins 完整结构 / webdriver / 按 UA 分支决定 userAgentData/connection）
   ③ window 补丁（chrome 对象按 UA 分支 / 30+ API 存根，每个经 markNative 处理）
@@ -359,10 +338,10 @@ Actions:
   - 用截获的签名值发起真实接口请求
   - 确认返回有效数据（非空 body / 非错误码）
   - 连续多次请求验证稳定性（至少 5 次）
-  - ⚠️ 服务端可能静默拒绝（返回 HTTP 200 + 空 body，不报错）
+  - ⚠️ 服务端可能静默拒绝（HTTP 200 + 空 body）。这只是现象，按问题路由的链路 B 定位，不要默认归因到环境
 ```
 
-**环境伪装还原策略**：
+**环境复现还原策略**：
 
 | 情况 | 策略 | 实现方式 |
 |---|---|---|
@@ -407,7 +386,7 @@ Actions:
 
 对静态分析的结论，在调试浏览器页面上进行运行时验证。
 
-#### 3.0 环境指纹采集（路径 B 核心突破点）
+#### 3.0 环境指纹采集（路径 B 使用）
 
 > v3.7.0 对齐 MCP v1.6.0 与 Camoufox Reverse reverse.5。默认分析路径不启用
 > 原生追踪；仅在路径 B 确实需要时显式选择定制版。
@@ -556,11 +535,11 @@ Actions:
 
 | 模式 | 适用场景 | Node.js 模板 | Python 模板 |
 |---|---|---|---|
-| A: 纯算法还原 | 加密逻辑可完整提取，无浏览器环境依赖 | `templates/node-request/` | `templates/python-request/` |
+| A: 纯算法还原（路线 R1） | 加密逻辑可完整提取，无浏览器环境依赖 | `templates/node-request/` | `templates/python-request/` |
 | B: 沙箱执行 JS | 服务端返回混淆 JS 用于生成 Cookie/Token | `templates/vm-sandbox/` | `templates/python-request/`（用 `execjs`） |
 | C: WASM 加载还原 | 加密逻辑在 WebAssembly 中实现 | `templates/wasm-loader/` | — |
 | D: 浏览器自动化（仅用户明确要求此交付） | 页面交互采集 | `templates/browser-auto/` | — |
-| E: jsdom 环境伪装 | JSVMP 深度绑定环境指纹、算法不可提取 | jsdom + `references/jsdom-env-patches.md` | — |
+| E: 环境复现（路线 R3、R4） | JSVMP 深度绑定环境、算法不可提取 | jsdom + `references/jsdom-env-patches.md`，或 [浏览器级运行时](original-sdk-runtime.md) | 浏览器级运行时 |
 
 #### 4.3 编码原则
 
@@ -572,7 +551,7 @@ Actions:
 6. **逐步验证**：每次只增加一个参数的实现，确保每步可独立验证
 7. **代码可运行**：提供的代码必须是可直接复制运行的，不留占位符
 8. **分析产物持久化**：长参数值、Cookie、JS 代码片段、请求样本等，第一时间写入 `config/` 目录
-9. **环境伪装最小化**：env-patch 只补经 `hook_function(mode='trace')` 证明 JSVMP 真的读了的 API，禁止"先加上保险"
+9. **环境复现最小化**：env-patch 只补经 `hook_function(mode='trace')` 证明 JSVMP 真的读了的 API，禁止"先加上保险"
 10. **UA 自洽**：环境补丁的每一项都必须与 `navigator.userAgent` 声明的浏览器一致
 
 #### 4.4 配置文件策略

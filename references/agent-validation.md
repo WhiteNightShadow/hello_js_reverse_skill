@@ -12,6 +12,10 @@
 
 本轮公开研究和方法见配套 MCP 的 [RESEARCH_AND_VALIDATION.md](https://github.com/WhiteNightShadow/camoufox-reverse-mcp/blob/v1.7.0/docs/RESEARCH_AND_VALIDATION.md)。借鉴响应文件与摘要分离、按需工具说明和最小证据闭环；未将 Chrome 调试协议或未经语义验证的 AST 变换直接当作 Camoufox 可用能力。
 
+最近一轮公开方案调研见 [公开 skill 库调研](../docs/research/2026-11-public-skill-survey.md)。
+
+方法层的行为回归放在 `evals/`：每个目录是一个虚构站点的诊断场景，比较新旧版本是否走对链路，详见 [evals/README.md](../evals/README.md)。场景里不写真实站点，改动路由或实验纪律后重跑。
+
 不要把本流程提升成每次点击、每次请求前的通用审查。业务执行的首检/失效规则仍见 [task-preflight.md](task-preflight.md)。
 
 真实上游 VM/CFF/加解密/指纹这一轮的来源、差分与 native 边界见 [REAL_SOURCE_VALIDATION.md](https://github.com/WhiteNightShadow/camoufox-reverse-mcp/blob/v1.8.0/docs/REAL_SOURCE_VALIDATION.md)；本仓库提供 [准备/验证脚本](../scripts/real_cases/README.md)，普通业务任务无需先执行整组实验。
