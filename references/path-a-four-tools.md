@@ -1,10 +1,12 @@
 # 路径 A：算法追踪 — 四板斧完整方法论
 
+目录：[一、四板斧总览](#一四板斧总览) · [二、快速路径（推荐优先试）](#二快速路径推荐优先试) · [三、第一板斧：Hook I/O（确定 I/O 边界）](#三第一板斧hook-io确定-io-边界) · [四、第二板斧：插桩解释器（追踪执行链路）](#四第二板斧插桩解释器追踪执行链路) · [五、第三板斧：日志分析（从海量数据提取签名链路）](#五第三板斧日志分析从海量数据提取签名链路) · [六、第四板斧：源码级插桩（通用 VMP 利器）](#六第四板斧源码级插桩通用-vmp-利器) · [七、路径 A 失败诊断与替代路径](#七路径-a-失败诊断与替代路径) · [八、路径 A 还原策略选择](#八路径-a-还原策略选择) · [九、JSVMP 核心经验（路径 A 专项）](#九jsvmp-核心经验路径-a-专项)
+
 > **触发条件**：遇到 JSVMP 特征且需要算法追踪时按需阅读
 >
 > **任务检查**：遵循 [task-preflight.md](task-preflight.md)，复用已有证据与首检；案例分类只作线索，验证当前适用性
 >
-> **版本**：Skill v3.9.0 / MCP v1.8.0（本地现代解析、保守改写、主世界/Frame 日志与证据边界）
+> **版本**：Skill v3.10.0 / MCP v1.8.0（本地现代解析、保守改写、主世界/Frame 日志与证据边界）
 
 ---
 
@@ -33,12 +35,12 @@
 | 第三斧 | 日志分析 | `get_trace_data` / 主世界日志 + 反向追踪 | 从已捕获 I/O 推断公式 | 未捕获的数据、preview 占位与容量限制 | 各类已采集证据均可分析 |
 | 第四斧 | 源码级插桩 | `instrumentation(action=...)` 的 install / log | 所选 VM 内部属性与调用位置 | 语法/语义 skip、体积限制、完整性检测与观测开销 | 各类均需原始/改写对照 |
 
-### 按反爬类型的适用性
+### 按观测敏感度的适用性
 
-| 反爬类型 | 可用板斧 | 说明 |
+| 类型 | 可用板斧 | 说明 |
 |----------|----------|------|
-| **签名型**（历史 RS / Akamai / Shape 案例） | 选择性源码插桩、有限运行时观测或环境复现 | 环境和源码完整性都可能被检查，先对照原始行为 |
-| **行为型**（历史短视频平台 / JY 案例） | 按需使用四斧 | 不能据分类推断没有原生性或完整性检测 |
+| **观测敏感**（原始与观测结果不同） | 选择性源码插桩、有限运行时观测或环境复现 | 环境和源码完整性都可能被检查，先对照原始行为 |
+| **观测不敏感**（原始与观测结果一致） | 按需使用四斧 | 只对已比较的路径成立，不能推断没有完整性检测 |
 | **纯混淆**（obfuscator.io / 自研 VMP） | 静态定位与按需动态验证 | 混淆特征不能排除观察者效应 |
 
 ---
@@ -78,7 +80,7 @@
   → 检查可能 capped / 返回截断；调用摘要需有意开启 rewrite_calls 并调整过滤范围后另行采样
 
 步骤 8：交叉印证
-  evaluate_js(expression="window.__mcp_jsvmp_log || []", world="main") + analyze_cookie_sources()
+  evaluate_js(expression="window.__mcp_jsvmp_log || []", world="main") + Cookie 归因
   → iframe SDK 使用同一 Frame；对照当前请求和原始结果，不把属性访问当作参与哈希的证明
 ```
 
@@ -112,7 +114,7 @@ MCP 操作：
                 log_args=True, max_captures=100, serialization='preview')
   → 记录调用入口；确需 non_overridable 时先了解锁定属性的卸载边界
 
-  analyze_cookie_sources()
+  # Cookie 归因：见 analysis-scenarios.md 的手动汇总
   → 辨识每个 Cookie 是 HTTP Set-Cookie / JS document.cookie / 混合写入
 ```
 
@@ -222,7 +224,7 @@ MCP 操作：
   get_trace_data(world="main")        → 同一 Frame 的函数追踪数据
   evaluate_js(expression="window.__mcp_jsvmp_log || []", world="main") → JSVMP 探针日志
   get_console_logs()                  → 控制台输出
-  get_runtime_probe_log()             → 运行时探针日志
+  evaluate_js(expression="window.__mcp_runtime_log || []", world="main") → 运行时探针日志
 ```
 
 #### 步骤 7：反向追踪法
@@ -261,7 +263,7 @@ MCP 操作：
 
 ### 为什么需要第四板斧
 
-若关键逻辑封装在字节码分发循环内，且没有经过可 Hook API，前三斧可能只能提供零散 I/O。历史 RS、Akamai、webmssdk 案例可作线索，但是否需要源码插桩，应由当前源码和捕获结果判断。
+若关键逻辑封装在字节码分发循环内，且没有经过可 Hook API，前三斧可能只能提供零散 I/O。是否需要源码插桩，由当前源码和捕获结果判断。
 
 ### 详细步骤
 
@@ -420,7 +422,7 @@ MCP 操作：
 4. **`get_trace_data` 返回的海量数据需要本地过滤** — 用反向追踪法效率最高
 5. **regex 是保守 whole-program 白名单** — 模板字符串、正则字面量、调用等复杂语法整段原样跳过；AST 解析成功也不代表所有节点均能改写或产物已执行
 6. **所有探针都需评估观察者效应** — Hook/Proxy 可改变原生性与对象身份；源码 tap 可被完整性、堆栈与耗时检测，不能承诺轻改写解决
-7. **`dump_jsvmp_strings` 前提是字符串未被动态解密** — 看到 `decoded_strings` 全是单字母乱码就是加密的
+7. **字符串提取的前提是字符串未被动态解密** — 保存脚本后本地提取的结果全是乱码时，说明字符串已加密
 8. **`search_code(keyword='while')` 在超大文件（380KB+）会返回大量无关结果** — 应使用 `search_code(keyword, script_url=url)` 配合更精确关键词
 9. **源码改写缓存会核对当前响应内容哈希** — 同 URL 的 SDK 更新不能沿用旧文本；仍需核对当前目标的 status 与运行证据
 10. **日志只支持已捕获范围内的结论** — 主世界/Frame、preview 占位、skip 与 possibly_capped 都影响解释；不能把空结果当未执行或把本地样本通过当商业站点成功

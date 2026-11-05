@@ -1,16 +1,18 @@
 # JSVMP 虚拟机保护分析指南
 
+目录：[什么是 JSVMP](#什么是-jsvmp) · [识别 JSVMP](#识别-jsvmp) · [四板斧方法论](#四板斧方法论v250-更新) · [常见 JSVMP 变体及应对](#常见-jsvmp-变体及应对) · [前置判断：先看 JSVMP 在请求链里的位置](#前置判断先看-jsvmp-在请求链里的位置) · [还原策略决策](#还原策略决策v250-扩充源码级插桩分支) · [实战检查清单](#实战检查清单v250-扩充四板斧项)
+
 ## 什么是 JSVMP
 
 JSVMP（JavaScript Virtual Machine Protection）是一种高级 JS 代码保护技术，将原始 JS 源码编译为自定义字节码，运行时由内嵌的虚拟机解释器逐条执行。这意味着：
 
 - 原始代码逻辑不再以 JS AST 形式存在，无法通过传统反混淆手段还原
 - 代码以字节码数组 + 解释器循环的形式运行
-- 常见于RS、JY、某数等商业级反爬方案
+- 常见于商业反爬 SDK
 
 **核心原则：不反编译字节码，用行为追踪法（Hook / 插桩 / 日志分析 / 源码级插桩四板斧）从 I/O 两端夹逼 + 中间层观察定位签名逻辑。**
 
-> **v2.5.0 更新**：第四板斧「源码级插桩」由 camoufox-reverse MCP v0.4.0 的 `instrumentation(action='install', ...)` 提供支持，在 HTTP 层改写 VMP 源码，对每个 `obj[key]` 和 `fn(args)` 插入 tap，捕获 VM 内部 switch/case 调度——是RS 5/6、Akamai sensor_data、webmssdk、obfuscator.io 这类"VM 自包含"场景的通用武器。详见 [`jsvmp-source-instrumentation.md`](./jsvmp-source-instrumentation.md)。 <!-- v3.1.0: migrated from instrument_jsvmp_source -->
+> **v2.5.0 更新**：第四板斧「源码级插桩」由 camoufox-reverse MCP v0.4.0 的 `instrumentation(action='install', ...)` 提供支持，在 HTTP 层改写 VMP 源码，对每个 `obj[key]` 和 `fn(args)` 插入 tap，捕获 VM 内部 switch/case 调度，适合"VM 自包含"的场景。详见 [`jsvmp-source-instrumentation.md`](./jsvmp-source-instrumentation.md)。
 
 ---
 
@@ -52,18 +54,16 @@ function _0xefgh() {
 
 ```
 MCP 操作（推荐顺序）：
-  - scripts(action='list') → 找到异常大的 JS 文件（100KB+） <!-- v3.1.0: migrated from list_scripts -->
-  - search_code(keyword='switch', script_url=<大 JS 的 url>, context_chars=500)   ← v0.4.0 推荐首选 <!-- v3.1.0: migrated from find_dispatch_loops -->
-    → 返回 candidates: [{fn_name, case_count, char_range, preview}]
-    → case_count > 50 的基本确认是 VMP 解释器
-  - dump_jsvmp_strings(script_url=<大 JS 的 url>) → 提取字符串数组
-    → 看 suspicious_patterns 是否包含 "JSVMP interpreter loop (while+switch, large source)"
-    → 看 api_names 是否包含 navigator/screen/encrypt/md5/hmac 等
+  - scripts(action='list') → 找到异常大的 JS 文件（100KB+）
+  - search_code(keyword='switch', script_url=<大 JS 的 url>, context_chars=500)   ← v0.4.0 推荐首选
+    → 分支很多的 while/switch 分发循环是解释器的线索，不是判定标准
+  - scripts(action='save', url=<大 JS 的 url>, save_path=...) → 保存后在本地提取字符串数组
+    → 看字符串里是否出现 navigator/screen/encrypt/md5/hmac 等 API 名
 
 兜底手动方式（大文件 search_code 超时时）：
-  - search_code(keyword="switch", script_url=N) → 前后 3 行上下文 <!-- v3.1.0: migrated from search_code_in_script -->
-  - search_code(keyword="case 0:|case 1:|case 2:", script_url=N) <!-- v3.1.0: migrated from search_code_in_script -->
-  - scripts(action='get', script_id=N, start_line=..., end_line=...) → 按 char_range 读取分发体 <!-- v3.1.0: migrated from get_script_source -->
+  - search_code(keyword="switch", script_url=N) → 前后 3 行上下文
+  - search_code(keyword="case 0:|case 1:|case 2:", script_url=N)
+  - scripts(action='get', script_id=N, start_line=..., end_line=...) → 按 char_range 读取分发体
 ```
 
 ---
@@ -77,8 +77,8 @@ MCP 操作（推荐顺序）：
                    │  inject_hook_preset(xhr|fetch    │
                    │    |crypto|cookie|websocket      │
                    │    |debugger_bypass|runtime_probe)│
-                   │  hook_function(..., mode='intercept', ...)  │ <!-- v3.1.0: migrated from freeze_prototype -->
-                   │  analyze_cookie_sources          │
+                   │  hook_function(..., mode='intercept', ...)  │
+                   │  Cookie 归因（手动汇总三个来源） │
                    └────────┬─────────────────────────┘
                             │
               夹逼 I/O ──→ ┌─┴─┐ ──→ 推断签名公式
@@ -86,9 +86,9 @@ MCP 操作（推荐顺序）：
               中间层 ──→  ┌─┘   └─┐ ──→ 追踪执行链路
                          │
   ┌── 第二板斧 插桩解释器 ────────────┐   ┌── 第四板斧 源码级插桩 ──────────┐
-  │  search_code(keyword='switch',   │   │  instrumentation(action='install')│ <!-- v3.1.0: migrated from find_dispatch_loops, instrument_jsvmp_source -->
-  │    script_url=..., context_chars) │   │  instrumentation(action='log')   │ <!-- v3.1.0: migrated from get_instrumentation_log -->
-  │  hook_function(mode='trace',     │   │  → summary.hot_keys             │ <!-- v3.1.0: migrated from trace_function -->
+  │  search_code(keyword='switch',   │   │  instrumentation(action='install')│
+  │    script_url=..., context_chars) │   │  instrumentation(action='log')   │
+  │  hook_function(mode='trace',     │   │  → summary.hot_keys             │
   │    分发函数/子函数)              │   │  → summary.hot_methods          │
   │  hook_jsvmp_interpreter          │   │  → summary.hot_functions        │
   │    (mode='proxy', track_props=True)│   └────────┬────────────────────────┘
@@ -97,8 +97,8 @@ MCP 操作（推荐顺序）：
                             ↓                      ↓
                    ┌── 第三板斧 日志分析 ──────────────────┐
                    │  instrumentation(log) + evaluate_js   │
-                   │    + get_runtime_probe_log            │
-                   │    + instrumentation(action='log')    │ <!-- v3.1.0: migrated from get_instrumentation_log -->
+                   │    + 运行时探针日志（__mcp_runtime_log）│
+                   │    + instrumentation(action='log')    │
                    │  反向追踪法（从签名值→明文）            │
                    │  多次请求对比法（找变化因子）          │
                    └───────────────────────────────────────┘
@@ -110,22 +110,22 @@ MCP 操作（推荐顺序）：
 |---------|-------------|
 | 签名通过 CryptoJS / atob / MD5 等可 hook API 走 | 第一 + 第三（hot API hook + 日志反推） |
 | VMP 通过 `Function.apply/call` 调子函数 | 第二 + 第三（`hook_jsvmp_interpreter` 多路径 + 日志） |
-| VMP 自包含，算法全在 switch/case 内（RS 5/6、Akamai、webmssdk、obfuscator.io） | **第四板斧首选**，配合第一板斧做 I/O 边界 |
-| VMP 深度绑定浏览器环境（compare_env 差异大 + 签名随环境变） | 路径 B 环境伪装（见 SKILL.md 场景 10），配第四板斧 `hot_keys` 定位指纹集 |
+| VMP 自包含，算法全在 switch/case 内 | **第四板斧首选**，配合第一板斧做 I/O 边界 |
+| VMP 深度绑定浏览器环境（compare_env 差异大 + 签名随环境变） | 路径 B 环境复现（见 analysis-scenarios.md 场景 10），配第四板斧 `hot_keys` 定位指纹集 |
 
 ---
 
-### 快速路径：v0.4.0 黄金 8 步流程（推荐先试，70%+ RS/Akamai/webmssdk 场景直接搞定）
+### 快速路径：八步流程（可以先试，效果按当前目标验证）
 
 ```
-Step 1 — search_code(keyword='switch', script_url=..., context_chars=500) 确认 VMP + 记下 fn_name / char_range <!-- v3.1.0: migrated from find_dispatch_loops -->
+Step 1 — search_code(keyword='switch', script_url=..., context_chars=500) 确认 VMP + 记下 fn_name / char_range
 Step 2 — hook_jsvmp_interpreter(script_url=<VMP basename>) 装多路径探针
 Step 3 — inject_hook_preset("cookie", persistent=True) + inject_hook_preset("xhr", persistent=True)
-Step 4 — instrumentation(action='install', url_pattern="**/<VMP 文件>", mode="ast", tag="vmp1")  ← 核心新步 <!-- v3.1.0: migrated from instrument_jsvmp_source -->
-Step 5 — instrumentation(action='reload') 让所有探针先于 VMP 生效 + 清日志 <!-- v3.1.0: migrated from reload_with_hooks -->
+Step 4 — instrumentation(action='install', url_pattern="**/<VMP 文件>", mode="ast", tag="vmp1")  ← 核心新步
+Step 5 — instrumentation(action='reload') 让所有探针先于 VMP 生效 + 清日志
 Step 6 — 触发业务操作
-Step 7 — instrumentation(action='log', tag_filter="vmp1", limit=300) 看 hot_keys / hot_methods / hot_functions <!-- v3.1.0: migrated from get_instrumentation_log -->
-Step 8 — analyze_cookie_sources() 归因最终 cookie 来源
+Step 7 — instrumentation(action='log', tag_filter="vmp1", limit=300) 看 hot_keys / hot_methods / hot_functions
+Step 8 — 按 analysis-scenarios.md 的 Cookie 归因分析确认最终 cookie 来源
 ```
 
 详细步骤见 [`jsvmp-source-instrumentation.md`](./jsvmp-source-instrumentation.md)「黄金 8 步流程」节。
@@ -139,7 +139,7 @@ Step 8 — analyze_cookie_sources() 归因最终 cookie 来源
 ```
 MCP 操作：
   - hook_jsvmp_interpreter → 自动 Hook Function.prototype.apply + 追踪 30+ 敏感属性读取
-  - dump_jsvmp_strings → 提取字符串数组，识别 API 名称，检测混淆模式
+  - scripts(action='save', ...) 后本地提取字符串，识别 API 名称和混淆模式
   - 触发目标操作（翻页、提交等）
   - evaluate_js("window.__mcp_jsvmp_log || []") → 获取结构化探针结果：
     · API 调用统计（哪些原生函数被 VM 调用）
@@ -166,7 +166,7 @@ MCP 操作：
       hook_code="console.log('[COOKIE_SET]', arguments[0], new Error().stack)",
       position="before", non_overridable=True
     ) → 拦截 Cookie 写入（防覆盖）
-  - hook_function(className="XMLHttpRequest", methodName="send", mode='intercept') <!-- v3.1.0: migrated from freeze_prototype -->
+  - hook_function(className="XMLHttpRequest", methodName="send", mode='intercept')
     → 冻结 XHR.send 防止 VM 覆盖 Hook
   - reload() → 刷新页面触发 Hook
   - get_console_logs → 查看捕获的签名值和调用栈
@@ -189,18 +189,9 @@ MCP 操作：
       position="before")
     → JSVMP 高频使用 fromCharCode 构造字符串
 
-  - add_init_script(script=`
-      // Hook 常见加密库入口
-      const _origMD5 = window.CryptoJS?.MD5;
-      if (_origMD5) {
-        window.CryptoJS.MD5 = function() {
-          console.log('[CryptoJS.MD5] input:', arguments[0]?.toString());
-          const result = _origMD5.apply(this, arguments);
-          console.log('[CryptoJS.MD5] output:', result.toString());
-          return result;
-        };
-      }
-    `)
+  - hook_function(function_path="CryptoJS.MD5", mode='trace', world="main", persistent=True,
+      log_args=true, log_return=true)
+    → Hook 常见加密库入口，用 get_trace_data 读取入参和返回值
 ```
 
 #### 1.3 I/O 关联分析
@@ -227,9 +218,9 @@ MCP 操作：
 ```
 MCP 操作：
   - search_code(keyword="while.*true") → 找到解释器主循环
-  - search_code(keyword="case 0:|case 1:|case 2:", script_url=N) <!-- v3.1.0: migrated from search_code_in_script -->
+  - search_code(keyword="case 0:|case 1:|case 2:", script_url=N)
     → 在指定大文件中搜索 opcode 分发表（前后 3 行上下文，更精确）
-  - scripts(action='get') → 读取解释器函数体 <!-- v3.1.0: migrated from get_script_source -->
+  - scripts(action='get') → 读取解释器函数体
 
 判断标准：
   - 函数体超过 500 行
@@ -245,7 +236,7 @@ MCP 操作：
 
 ```
 MCP 操作：
-  - hook_function( <!-- v3.1.0: migrated from trace_function -->
+  - hook_function(
       function_path="解释器分发函数名",
       mode='trace',
       log_args=true, log_return=true, max_captures=500,
@@ -266,8 +257,8 @@ MCP 操作：
 从第一轮日志中识别被频繁调用的子函数（通常 3-5 个核心函数）：
 
 MCP 操作：
-  - hook_function(function_path="子函数A", mode='trace', log_args=true, log_return=true, log_stack=true) <!-- v3.1.0: migrated from trace_function -->
-  - hook_function(function_path="子函数B", mode='trace', log_args=true, log_return=true, log_stack=true) <!-- v3.1.0: migrated from trace_function -->
+  - hook_function(function_path="子函数A", mode='trace', log_args=true, log_return=true, log_stack=true)
+  - hook_function(function_path="子函数B", mode='trace', log_args=true, log_return=true, log_stack=true)
   - 再次触发请求
   - get_trace_data → 分析子函数的输入输出
 ```
@@ -308,7 +299,7 @@ MCP 操作：
 **方法 2：手动注入监控脚本**
 
 ```javascript
-// 通过 add_init_script(persistent=True) 注入
+// 思路示例。当前 MCP 没有通用 init script 工具，按需拆成 hook_function(..., persistent=True)
 
 (function() {
   // 方法1：监控全局变量写入
@@ -362,7 +353,7 @@ MCP 操作：
   - get_trace_data → 获取函数追踪数据（自动合并页面数据 + Python 端持久化数据）
   - evaluate_js("window.__mcp_jsvmp_log || []") → 获取 JSVMP 专项日志
   - get_console_logs → 获取 Hook 输出
-  - get_breakpoint_data → 获取伪断点捕获数据
+  - get_trace_data → 获取伪断点捕获数据
   - evaluate_js("window.__mcp_jsvmp_log || []") → 获取 JS Proxy 属性访问记录
 ```
 
@@ -444,10 +435,10 @@ MCP 操作：
 ```
 - Hook 更底层的接口：
   · hook_function(function_path="XMLHttpRequest.prototype.send", ...)
-  · 在 add_init_script 中保存原始引用，在 VM 重写之前
+  · 用持久 Hook 在 VM 重写之前保存原始引用
 
 - 或 Hook 网络层：
-  · network_capture(action='start') → 不依赖 JS 层 Hook，直接在协议层捕获 <!-- v3.1.0: migrated from start_network_capture -->
+  · network_capture(action='start') → 不依赖 JS 层 Hook，直接在协议层捕获
   · list_network_requests → get_network_request → 获取完整请求详情
 ```
 
@@ -472,7 +463,7 @@ MCP 操作：
 ```
 - 不要试图理解嵌套关系
 - 依然从 I/O 两端入手，Hook 最终的出口和最初的入口
-- 增加 hook_function(mode='trace') 的 max_captures 到 1000+ <!-- v3.1.0: migrated from trace_function -->
+- 增加 hook_function(mode='trace') 的 max_captures 到 1000+
 - 用时间戳过滤法缩小日志范围
 ```
 
@@ -509,46 +500,43 @@ MCP 操作：
 
 ---
 
-## 前置判断（v2.6.0 新增）：先识别 JSVMP 所在反爬类型
+## 前置判断：先看 JSVMP 在请求链里的位置
 
-在选路径 A / B 之前，先判断 JSVMP 的反爬类型：
+在选路径 A / B 之前，先看它在请求链里的位置。这只是选观测手段的线索，不是工具禁用规则，也不决定厂商：
 
 ```
 navigate(url) 不加任何 hook 观察 redirect_chain
 │
-├─ 反复 412 后才到 200 → 签名型 JSVMP（RS/Akamai）
-│   └─ 走"签名型专属路径"（见下文）
+├─ 业务页之前有挑战响应链 → 值可能在加载阶段就参与校验，观测容易改变行为
+│   └─ 优先低干扰观测（见下文）
 │
-├─ 直接 200 但主请求链带签名参数 → 行为型 JSVMP（短视频平台/JY）
+├─ 首屏正常，业务请求带动态参数 → 可按需组合 Hook、插桩和环境复现
 │   └─ 按原路径 A / 路径 B 决策树选择
 │
 └─ 直接 200 无签名参数 → 非 JSVMP 或 VMP 已被跳过
     └─ 回 Phase 2.2 常规混淆分析
 ```
 
-### 签名型 JSVMP 专属路径（v2.6.0 新增）
+### 观测容易改变行为时的路径
 
-签名型 JSVMP 与原路径 A / B 的决策树**不适用**，因为：
-- 路径 A 的前三板斧（Hook/插桩/日志）会破坏签名
-- 路径 B 的 jsdom 环境伪装成本高（58+ 项修复）
+有些 SDK 对环境和源码完整性敏感，这时 Hook 或 Proxy 可能改变产出的值。判断依据是原始与观测两次运行的结果是否不同，而不是站点类型。
 
-签名型 JSVMP 推荐走的路：
+可以按这个顺序尝试：
 
 ```
-1. instrumentation(action='install', mode="ast", tag="...")  (第四板斧) <!-- v3.1.0: migrated from instrument_jsvmp_source -->
-2. instrumentation(action='reload')  让插桩后的 VMP 跑完挑战 <!-- v3.1.0: migrated from reload_with_hooks -->
-3. instrumentation(action='log', tag_filter, type_filter="tap_get") <!-- v3.1.0: migrated from get_instrumentation_log -->
+1. instrumentation(action='install', mode="ast", tag="...")  (第四板斧)
+2. instrumentation(action='reload')  让插桩后的 VMP 跑完挑战
+3. instrumentation(action='log', tag_filter, type_filter="tap_get")
 4. 基于 hot_keys 补最小环境，在 jsdom 或纯 Python 侧独立跑
    （此时 jsdom 补环境的粒度比路径 B 小得多，只补 hot_keys 显示的属性）
 ```
 
-源码级插桩失败才回落：
+源码级插桩不可用时：
 ```
 A. hook_jsvmp_interpreter(mode="transparent")  仅 prototype getter 替换
-   - 对签名型大多数情况安全
-   - 极严格反爬仍能识别 getter identity 变化，此时真的只能走路径 B 全量 jsdom 伪装
-B. 路径 B 完整 jsdom 环境伪装（六步法）
-   - 最重但最稳，是最后的兜底
+   - 干扰较小，但 getter 身份变化仍可能被识别，要用原始对照确认
+B. 原始 SDK 运行路线（路径 B 或浏览器级运行时）
+   - 不观察内部，直接运行，见 original-sdk-runtime.md
 ```
 
 ---
@@ -577,9 +565,9 @@ JSVMP 签名还原决策树：
   └─ NO → 第 3 步
 
 第 3 步：VMP 劫持了整个请求链路 + hot_keys 显示大量环境读取？
-  ├─ YES → 走路径 B（jsdom 环境伪装）
-  │   · hot_keys 直接告诉你要对齐哪些环境属性（省去 58 项人工 diff）
-  │   · analyze_cookie_sources 确认 cookie 是否来自 HTTP Set-Cookie
+  ├─ YES → 走路径 B（jsdom 环境复现）
+  │   · hot_keys 直接告诉你要对齐哪些环境属性（省去人工全量 diff）
+  │   · 查响应头确认 cookie 是否来自 HTTP Set-Cookie
   │   · 参考 references/jsdom-env-patches.md
   └─ NO（jsdom 加载失败 / VMP 有 CDN 反射检测）→ 第 4 步
 
@@ -602,17 +590,17 @@ JSVMP 签名还原决策树：
 在 JSVMP 分析过程中，确保以下每项都已完成：
 
 **第一板斧 — Hook 出入口**：
-- [ ] `search_code(keyword='switch', script_url=..., context_chars=500)` 确认是 VMP（case_count > 50） <!-- v3.1.0: migrated from find_dispatch_loops -->
+- [ ] `search_code(keyword='switch', script_url=..., context_chars=500)` 确认是 VMP（case_count > 50）
 - [ ] `inject_hook_preset("xhr", persistent=True)` + `("fetch", persistent=True)` 捕获请求出口
 - [ ] `inject_hook_preset("cookie", persistent=True)` **原型链级** cookie hook（替代手写 Document.prototype.cookie 的做法）
-- [ ] `analyze_cookie_sources` 归因最终 cookie（HTTP vs JS）
+- [ ] 归因最终 cookie（HTTP vs JS），见 analysis-scenarios.md
 - [ ] `inject_hook_preset("crypto", persistent=True)` 捕获加密原语入口（btoa/atob/CryptoJS/MD5/SHA）
 - [ ] Hook String.fromCharCode（JSVMP 高频信号）
-- [ ] `hook_function(..., mode='intercept', ...)` 防止 VMP 覆盖 hook <!-- v3.1.0: migrated from freeze_prototype -->
+- [ ] `hook_function(..., mode='intercept', ...)` 防止 VMP 覆盖 hook
 
 **第二板斧 — 插桩解释器**：
 - [ ] `hook_jsvmp_interpreter(script_url=<VMP basename>)` 多路径探针（apply/call/bind + Reflect.*/Proxy）
-- [ ] 分层 `hook_function(mode='trace')`（粗 → 中 → 细，用 `max_captures` 限制日志量） <!-- v3.1.0: migrated from trace_function -->
+- [ ] 分层 `hook_function(mode='trace')`（粗 → 中 → 细，用 `max_captures` 限制日志量）
 - [ ] `hook_jsvmp_interpreter(mode='proxy', track_props=True, proxy_objects=["navigator", "screen", ...])` 监控所选对象（JS 层，可检测）
 
 **第三板斧 — 日志分析**：
@@ -621,21 +609,21 @@ JSVMP 签名还原决策树：
 - [ ] 多次请求对比，确认变化因子和固定因子
 
 **第四板斧 — 源码级插桩 [v2.5.0 新增]**：
-- [ ] `instrumentation(action='install', url_pattern=..., mode="ast"|"regex", tag=...)` 装好 <!-- v3.1.0: migrated from instrument_jsvmp_source -->
-- [ ] `instrumentation(action='reload')` 让插桩先于 VMP 生效 <!-- v3.1.0: migrated from reload_with_hooks -->
-- [ ] 读 `instrumentation(action='log')` 三个 summary：`hot_keys` / `hot_methods` / `hot_functions` <!-- v3.1.0: migrated from get_instrumentation_log -->
+- [ ] `instrumentation(action='install', url_pattern=..., mode="ast"|"regex", tag=...)` 装好
+- [ ] `instrumentation(action='reload')` 让插桩先于 VMP 生效
+- [ ] 读 `instrumentation(action='log')` 三个 summary：`hot_keys` / `hot_methods` / `hot_functions`
 - [ ] `hot_keys` 给出 VMP 读取的环境指纹集（top 30）
 - [ ] `hot_methods` 给出 VMP 调用的方法（ObjectType.methodName 格式）
 - [ ] `hot_functions` 给出 VMP 调用的函数名
-- [ ] `instrumentation(action='stop')` 完工清理 <!-- v3.1.0: migrated from stop_instrumentation -->
+- [ ] `instrumentation(action='stop')` 完工清理
 
 **环境/时序**：
-- [ ] 若目标是首屏挑战页，用 `navigate(pre_inject_hooks=[...])` 或 `via_blank=True`
+- [ ] 若目标是首屏挑战页，用 `navigate(pre_inject_hooks=[...])`
 - [ ] `compare_env` 采集环境基准
-- [ ] `bypass_debugger_trap` 绕过反调试
+- [ ] `inject_hook_preset(preset="debugger_bypass")` 绕过反调试
 
 **还原与验证**：
 - [ ] 根据 hot_methods 判断算法类型
-- [ ] 选择还原策略（纯算法 / 沙箱 / 完整 VM / jsdom 环境伪装 / 浏览器）
+- [ ] 选择还原策略（纯算法 / 沙箱 / 完整 VM / jsdom 环境复现 / 浏览器）
 - [ ] 实现并验证签名计算结果
 - [ ] 端到端验证（连续 5+ 次请求稳定）

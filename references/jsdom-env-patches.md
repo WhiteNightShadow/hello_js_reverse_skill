@@ -1,8 +1,12 @@
 # jsdom 环境补丁知识库
 
+目录：[概述](#概述) · [使用方法](#使用方法) · [常见候选一：原生性与自动化标记](#常见候选一原生性与自动化标记) · [常见候选二：对象标签与性能](#常见候选二对象标签与性能) · [常见候选三：API 存在性](#常见候选三api-存在性) · [window 尺寸属性](#window-尺寸属性) · [Node.js 特征清除](#nodejs-特征清除) · [完整 patchEnvironment 调用顺序](#完整-patchenvironment-调用顺序) · [环境采集对比方法](#环境采集对比方法) · [MCP 辅助工作流](#mcp-辅助工作流)
+
 ## 概述
 
-当 JSVMP 选择路径 B（环境伪装）在 jsdom 中运行时，jsdom 与真实浏览器存在大量差异。
+> 这里是代码模板，不是必做清单。先用读值证据确认 SDK 实际读取，只补读到且与基线不同的项，判读方法见 [读值差异](original-sdk-runtime.md#读值差异)。分组只表示常见程度，不代表服务端规则。
+
+当 JSVMP 选择路径 B（环境复现）在 jsdom 中运行时，jsdom 与真实浏览器存在大量差异。
 本文档提供系统化的环境补丁方案，按检测影响分级，所有代码模板可直接复用。
 
 ## 使用方法
@@ -29,14 +33,14 @@ function createPatchedJsdom(url, options = {}) {
 
 ---
 
-## 致命级补丁（缺失即被服务端拒绝）
+## 常见候选一：原生性与自动化标记
 
 ### 1. Function.prototype.toString 三层防御
 
 **问题**：jsdom 所有 DOM 方法都是 JS 实现，`toString()` 会暴露完整源码（如 `createElement(localName) { const esValue = ...`），
 JSVMP 通过此检测判断是否在真实浏览器中。
 
-**难度**：★★★★★ — 这是 jsdom 环境伪装的第一杀手
+**难度**：★★★★★ — jsdom 路线里最容易暴露差异的一项
 
 ```javascript
 const _origFnToString = win.Function.prototype.toString;
@@ -289,7 +293,7 @@ function patchDOMLayout(win) {
 
 ---
 
-## 高危级补丁（可能参与指纹哈希）
+## 常见候选二：对象标签与性能
 
 ### 6. Object.prototype.toString 标签（Symbol.toStringTag）
 
@@ -521,7 +525,7 @@ function patchScreen(win, options) {
 
 ---
 
-## 中危级补丁（API 存在性检测）
+## 常见候选三：API 存在性
 
 JSVMP 可能通过 `typeof window.XXX` 检测 API 是否存在。以下是 jsdom 缺失但浏览器存在的 API 存根。
 
@@ -827,13 +831,13 @@ function patchEnvironment(win, doc, nav, options = {}) {
   // ② 扫描并标记所有 jsdom 内置原型链方法
   scanAllPrototypes(win, doc, nav);
 
-  // ③ 致命级补丁
+  // ③ 候选一
   patchNavigatorBasics(nav, options);       // webdriver / platform / language
   buildPluginArray(win);                     // plugins 完整结构
   doc.hasFocus = markNative(function hasFocus() { return true; });
   patchDOMLayout(win);                       // offsetHeight/Width/getBoundingClientRect
 
-  // ④ 高危级补丁
+  // ④ 候选二
   patchToStringTags(win, doc, nav);          // Symbol.toStringTag
   patchChrome(win);                          // window.chrome
   patchUserAgentData(nav);                   // userAgentData
@@ -842,7 +846,7 @@ function patchEnvironment(win, doc, nav, options = {}) {
   patchScreen(win, options);                 // colorDepth/orientation
   patchWindowDimensions(win, options);        // innerWidth/outerWidth/devicePixelRatio
 
-  // ⑤ 中危级补丁
+  // ⑤ 候选三
   patchWindowAPIs(win);                      // 30+ API 存根
   patchNavigatorAPIs(nav);                   // connection/getBattery
   patchDocumentAPIs(doc);                    // fonts/timeline

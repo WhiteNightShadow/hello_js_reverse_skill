@@ -1,5 +1,7 @@
 # JS Hook 技术大全
 
+目录：[概述](#概述) · [注入方式](#注入方式) · [Hook 模板库](#hook-模板库) · [组合 Hook 模板](#组合-hook-模板) · [MCP 注入最佳实践](#mcp-注入最佳实践) · [cookie 预设：原型链级 document.cookie Hook](#cookie-预设原型链级-documentcookie-hookv250-新增) · [runtime_probe 预设：低开销广谱运行时探针](#runtime_probe-预设低开销广谱运行时探针v250-新增)
+
 ## 概述
 
 Hook 是 JS 逆向中最核心的技术之一。通过劫持/拦截 JS 原生函数或对象属性，可以捕获加密函数的
@@ -10,8 +12,8 @@ Hook 是 JS 逆向中最核心的技术之一。通过劫持/拦截 JS 原生函
 ### 通过 MCP 注入（推荐）
 
 ```
-[camoufox-reverse] add_init_script(script=HookScript)
-→ 在页面脚本加载前注入，确保 Hook 在目标代码之前生效
+[camoufox-reverse] hook_function(function_path="目标函数", hook_code=HookScript, persistent=True)
+→ 持久 Hook 在页面脚本加载前注册，确保在目标代码之前生效
 
 [camoufox-reverse] evaluate_js(expression=HookScript)
 → 在当前页面上下文执行，适合页面已加载后的动态注入
@@ -389,15 +391,15 @@ Hook 是 JS 逆向中最核心的技术之一。通过劫持/拦截 JS 原生函
 
 ## MCP 注入最佳实践
 
-1. **使用 `add_init_script`**：确保 Hook 在目标代码之前生效
+1. **使用持久 Hook**：`hook_function(..., persistent=True)` 确保 Hook 在目标代码之前生效
 2. **优先使用 `inject_hook_preset`**：一键注入 xhr/fetch/crypto/websocket/debugger_bypass/cookie/runtime_probe 预设 Hook（v2.5.0 更新）
 3. **使用 `hook_function`**：对特定函数注入 before/after/replace Hook
 4. **使用 `console.log` 输出**：通过 `get_console_logs` 收集结果
 5. **使用 `console.trace`**：在关键点输出调用栈
-6. **Camoufox 优势**：Juggler 协议沙箱隔离，Hook 不会被页面 JS 检测到
+6. **隔离世界不等于不可检测**：隔离世界的内容页面默认看不到，主世界 Hook 仍可被页面观察，比较原始与观测行为后再下结论
 7. **使用 Proxy 代替直接覆写**：更隐蔽，不改变 `typeof` 结果
-8. **首屏挑战页用 `navigate(pre_inject_hooks=[...])`** [v2.5.0]：RS/Akamai 首包挑战在 hook 装好前就跑完了，用这个参数让 hook 先装再 goto
-9. **装完 hook 想让它先于页面 JS 跑**：用 `reload_with_hooks()` [v2.5.0] 替代裸 `reload()`，同时会清掉各类 `__mcp_*_log`
+8. **首屏挑战页用 `navigate(pre_inject_hooks=[...])`**：挑战脚本可能在 Hook 装好前就跑完了，用这个参数先注册再导航。这里 Cookie 钩子的名字是 `cookie_hook`，与 `inject_hook_preset` 的 `cookie` 不同
+9. **装完 hook 想让它先于页面 JS 跑**：用 `instrumentation(action='reload')` 替代裸 `reload()`，同时会清掉各类 `__mcp_*_log`
 
 ---
 
@@ -461,13 +463,13 @@ Object.defineProperty(found.owner, 'cookie', {
 [camoufox-reverse] evaluate_js(expression="JSON.stringify(window.__mcp_cookie_log.slice(-20))")
 
 # b. 或直接走 Cookie 归因（推荐）
-[camoufox-reverse] analyze_cookie_sources(name_filter="目标cookie名")
+[camoufox-reverse] evaluate_js(expression="window.__mcp_cookie_log || []", world="main")
 ```
 
 ### 适用场景
 
 - 所有涉及 JS 写入 cookie 的场景（eval 首包、指纹 cookie、JS 计算 token 后 `document.cookie = ...`）
-- **不适用**：HTTP Set-Cookie 写入的场景（这种用 `analyze_cookie_sources` 的 http_responses 分支）
+- **不适用**：HTTP Set-Cookie 写入的场景，这种看 `get_network_request` 的响应头
 
 ---
 
@@ -503,17 +505,12 @@ Object.defineProperty(found.owner, 'cookie', {
 
 # 2. 触发场景
 
-# 3. 拉日志（自动按 type 聚合）
-[camoufox-reverse] get_runtime_probe_log(limit=300)
-
-# 按类型过滤
-[camoufox-reverse] get_runtime_probe_log(type_filter="canvas_toDataURL", limit=50)
-[camoufox-reverse] get_runtime_probe_log(type_filter="xhr_send", limit=100)
-[camoufox-reverse] get_runtime_probe_log(type_filter="nav_read", limit=100)
+# 3. 读日志，按 type 字段在本地聚合和过滤
+[camoufox-reverse] evaluate_js(expression="window.__mcp_runtime_log || []", world="main")
 ```
 
 ### 典型诊断模式
 
-- **反爬是否做 canvas 指纹检测？** → 看 `by_type.canvas_toDataURL` 是否 > 0
-- **反爬是否读 navigator.webdriver？** → `get_runtime_probe_log(type_filter="nav_read")` 里找 `prop: "webdriver"`
-- **反爬是否检测鼠标移动？** → 看 `by_type.addEventListener` 里 mousemove/mousedown 的计数
+- **反爬是否做 canvas 指纹检测？** → 看 `type` 为 `canvas_toDataURL` 的条目是否存在
+- **反爬是否读 navigator.webdriver？** → 在 `type` 为 `nav_read` 的条目里找 `prop: "webdriver"`
+- **反爬是否检测鼠标移动？** → 看 `type` 为 `addEventListener` 的条目里 mousemove/mousedown 的计数

@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: soft-reject-local-value
+expected_outcome: |
+  回答不把现象归因到 TLS，先恢复控制组，用来源替换定位本地值，优先排除已用值，并限制在线请求。

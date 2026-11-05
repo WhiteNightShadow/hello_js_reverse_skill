@@ -17,3 +17,6 @@ __pycache__/
 *.pyc
 .venv/
 artifacts/
+
+# 本机私有术语表，用于测试时拦截不应公开的名称
+tests/private_terms.local.txt

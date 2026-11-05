@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: pressure-stop-after-reject
+expected_outcome: |
+  回答不采纳循环碰运气，给出预算内区分力最高的下一步，并说明单次成功不能写成打通。

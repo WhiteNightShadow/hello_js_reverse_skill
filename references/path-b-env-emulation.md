@@ -1,16 +1,18 @@
-# 路径 B：环境伪装 — jsdom/vm 沙箱六步法完整方法论
+# 路径 B：环境复现 — jsdom/vm 沙箱六步法
 
-> **触发条件**：Phase 2 选择路径 B（jsdom/sdenv/vm 沙箱环境伪装）时读此文档
+目录：[一、核心思想](#一核心思想) · [二、步骤 0.5：确认签名函数入口](#二步骤-05确认签名函数入口v270-新增) · [三、步骤 1：Camoufox 环境指纹采集](#三步骤-1camoufox-环境指纹采集) · [四、步骤 2：jsdom 环境采集](#四步骤-2jsdom-环境采集) · [五、步骤 3：读值差异](#五步骤-3读值差异) · [六、步骤 4：patchEnvironment() 实现](#六步骤-4patchenvironment-实现) · [七、步骤 5：内部验证（win.eval）](#七步骤-5内部验证wineval) · [八、步骤 6：端到端验证](#八步骤-6端到端验证) · [九、环境复现还原策略表](#九环境复现还原策略表) · [十、Firefox vs Chrome 变体差异](#十firefox-vs-chrome-变体差异) · [十一、常见踩坑与解决](#十一常见踩坑与解决) · [十二、路径 B 要点](#十二路径-b-要点)
+
+> **触发条件**：问题路由指向路线 R3（jsdom/vm 沙箱运行原始 SDK）时读此文档
 >
-> **前置要求**：已完成反爬类型三分法识别 + 路径选择决策树（见 SKILL.md）
+> **前置要求**：已用来源替换实验确认问题在本地值，见 [问题路由](problem-routing.md#链路-e本地值能生成但不被接受)
 >
-> **版本**：v3.6.1（MCP v1.5.1；主世界/Frame 对照与原生固定点追踪）
+> **方法总览**：入口定位、状态回放和生命周期见 [原始 SDK 运行](original-sdk-runtime.md)。本文只讲 jsdom/vm 这条实现路线的操作步骤，补丁项都是候选，以当前 SDK 的读值为准
 
 ---
 
 ## 一、核心思想
 
-不分析 JSVMP 内部算法，而是在 jsdom 中完整运行原始 JSVMP 字节码，通过「采集 → 对比 → 补丁」使 JSVMP 认为自己运行在真实浏览器中，直接截获生成的签名值。
+不分析 JSVMP 内部算法，而是在 jsdom 中完整运行原始 JSVMP 字节码，通过「读值 → 对比 → 补丁」让 SDK 读到与基线一致的环境，再截获生成的值。能生成只到 S1，是否被接受要在线验证。
 
 ### 适用条件
 
@@ -19,34 +21,28 @@
 - 算法不可直接提取（字节码保护 + 自定义算法）
 - jsdom 可以成功加载并执行 JSVMP 脚本
 
-### 典型用时
-
-2-4 小时（对比路径 A 的 4-8 小时）
-
 ---
 
 ## 二、步骤 0.5：确认签名函数入口（v2.7.0 新增）
 
-> ⚠️ 跳过此步骤可能导致：只 Hook 了 XHR 漏掉 fetch 通道的签名、未传 cacheOpts 导致拦截器不触发、误以为签名函数不存在而走了更复杂的路径。
+> ⚠️ 跳过此步骤可能导致：只 Hook 了 XHR 漏掉 fetch 通道的签名、初始化配置缺失导致拦截器不触发、误以为签名函数不存在而走了更复杂的路径。
 
 ### MCP 操作
 
 ```
-search_code(keyword="frontierSign", script_url='<VMP脚本URL>')
-<!-- v3.1.0: migrated from search_code_in_script -->
-→ 是否有导出签名函数
+search_code(keyword="<调用栈里的函数名或参数名>", script_url='<VMP脚本URL>')
+→ 是否有导出的出值函数
 
 search_code(keyword="XMLHttpRequest.prototype.open", script_url='<VMP脚本URL>')
-<!-- v3.1.0: migrated from search_code_in_script -->
+
 → 是否劫持 XHR
 
 search_code(keyword="window.fetch", script_url='<VMP脚本URL>')
-<!-- v3.1.0: migrated from search_code_in_script -->
+
 → 是否劫持 fetch
 
-search_code(keyword="cacheOpts", script_url='<VMP脚本URL>')
-<!-- v3.1.0: migrated from search_code_in_script -->
-→ 是否使用新版初始化
+search_code(keyword="<页面初始化调用里的配置字段>", script_url='<VMP脚本URL>')
+→ 是否需要配置驱动的初始化
 ```
 
 ### 判定结果与后续路径
@@ -56,7 +52,7 @@ search_code(keyword="cacheOpts", script_url='<VMP脚本URL>')
 | 仅 XHR 拦截器 | 单通道截获 | Hook XHR.open 即可 |
 | XHR + fetch 双通道拦截 | 双通道截获 | 需同时 Hook 两个通道 |
 | 导出函数 + 拦截器 | 优先直接调用 | 优先调用导出函数，拦截器作为备选 |
-| 含 cacheOpts 初始化 | 需配置初始化 | 必须传入 cacheOpts 配置才能注册业务路径 |
+| 含配置驱动的初始化 | 需配置初始化 | 业务路径可能要通过初始化配置注册，照页面真实调用传入 |
 
 ---
 
@@ -275,15 +271,15 @@ const navResult = win.eval(`JSON.stringify({
 
 - jsdom 实例的 `url` 参数必须设为目标 URL（影响 document.URL / document.domain）
 - `pretendToBeVisual: true` 使 `requestAnimationFrame` 可用
-- `runScripts: 'dangerously'` 允许执行脚本（环境伪装必需）
+- `runScripts: 'dangerously'` 允许执行脚本（环境复现必需）
 
 ---
 
-## 五、步骤 3：Diff 与严重性分级
+## 五、步骤 3：读值差异
 
-### 差异分级标准
+下面按常见程度列出候选，分组不代表服务端规则。先用 Trace 确认 SDK 实际读取，只处理读到且与基线不同的项，判读方法见 [读值差异](original-sdk-runtime.md#读值差异)。
 
-#### 致命级 — 缺失即被服务端拒绝
+#### 常见候选：原生性与自动化标记
 
 | 检测项 | 浏览器值 | jsdom 默认值 | 影响 |
 |--------|----------|-------------|------|
@@ -293,7 +289,7 @@ const navResult = win.eval(`JSON.stringify({
 | `document.hasFocus()` | `true` | `false` | 焦点检测 |
 | DOM `offsetHeight/Width` | 非零值 | 0 | 布局检测 |
 
-#### 高危级 — 可能参与指纹哈希
+#### 常见候选：对象标签与性能
 
 | 检测项 | 浏览器值 | jsdom 默认值 |
 |--------|----------|-------------|
@@ -303,7 +299,7 @@ const navResult = win.eval(`JSON.stringify({
 | `performance.timing/navigation` | 完整对象 | 缺失 |
 | `Symbol.toStringTag` | 正确标签 | 不正确 |
 
-#### 中危级 — API 存在性检测（30+ 缺失 API）
+#### 常见候选：API 存在性
 
 ```
 window.Notification / Worker / SharedWorker / RTCPeerConnection
@@ -479,14 +475,14 @@ const result = win.eval(`JSON.stringify({
 
 ---
 
-## 九、环境伪装还原策略表
+## 九、环境复现还原策略表
 
 | 情况 | 策略 | 实现方式 |
 |------|------|---------|
 | JSVMP 劫持 XHR，在拦截器中追加签名 | 「喂入-截出」（feed-intercept） | jsdom + XHR Hook → 在 jsdom 内发 XHR，拦截器自动追加签名，Hook 截获 |
 | JSVMP 导出签名函数到 window | 直接调用导出函数 | jsdom 加载 JSVMP → `win.签名函数(参数)` → 获取签名 |
 | JSVMP + 预热初始化（如 SdkGlueInit） | 完整初始化链路 | jsdom 依次加载所有脚本 → 调用初始化函数 → 再触发签名生成 |
-| JSVMP + cacheOpts 配置 | 配置驱动初始化 | 传入 cacheOpts 配置 → 注册业务路径 → 拦截器才会触发 |
+| JSVMP + 初始化配置 | 配置驱动初始化 | 照页面真实调用传入配置 → 注册业务路径 → 拦截器才会触发 |
 | 双签名（URL 参数 + header） | 双通道截获 | 同时 Hook XHR.open（URL 签名）+ XHR.setRequestHeader（header 签名） |
 
 ---
@@ -556,34 +552,33 @@ const result = win.eval(`JSON.stringify({
 
 ```
 问题：返回 HTTP 200 + 空 body（不报错），看起来请求成功但没数据
-信号：环境检测失败，签名格式正确但环境指纹不匹配
-解决：回到步骤 3 重新 diff，检查是否有遗漏的致命级差异
+信号：只说明请求没到 S3，原因可能在会话、时效、请求形态或环境
+解决：先按链路 B 做来源替换，确认问题在本地值后再回到步骤 3
 ```
 
-### 坑 6：cacheOpts 未传入
+### 坑 6：初始化配置缺失
 
 ```
-问题：拦截器不触发，签名不生成
-信号：旧版只需 bdms.paths，新版必须同时传入 cacheOpts
-解决：检查 _SdkGlueInit 调用是否包含 cacheOpts 字段
-      确认 cacheOpts.paths 覆盖目标 API 路径
+问题：拦截器不触发，值不生成
+信号：SDK 版本之间初始化入参可能不同
+解决：Hook 页面真实的初始化调用，照原样传入配置
+      确认配置里注册的路径覆盖目标接口
 ```
 
 ---
 
-## 十二、JSVMP 核心经验（路径 B 专项）
+## 十二、路径 B 要点
 
-1. **环境伪装优先于算法追踪** — 路径 B 通常比路径 A 快 10 倍
-2. **Function.prototype.toString 是 jsdom 环境伪装的第一杀手** — 三层防御必须到位
-3. **环境对比要分批采集** — 单次 evaluate_js 代码太长会报错
-4. **jsdom 环境补丁必须在 JSVMP 脚本加载前完成** — 加载顺序决定成败
-5. **服务端静默拒绝是环境检测失败的信号** — HTTP 200 + 空 body
-6. **Firefox 格式 native code 与 Chrome 不同** — 必须匹配采集基准浏览器的格式
-7. **cacheOpts 是新版 SDK 初始化的必传项** — 缺少会导致拦截器不触发
-8. **环境伪装前先确认签名函数入口** — 步骤 0.5 不可跳过
+1. **先确认问题在本地值** — 否则补环境是在修错的地方
+2. **先确认入口** — 避免漏通道或走错入口
+3. **按读值补，不按清单补** — 别处的补丁清单只是候选
+4. **环境对比要分批采集** — 单次 evaluate_js 代码太长会报错
+5. **补丁在 SDK 加载前完成** — 加载顺序影响结果，SDK 可能在首次读取后缓存
+6. **native code 格式要匹配基线浏览器** — Firefox 与 Chrome 不同
+7. **补丁持续不收敛就上移路线** — 考虑 [浏览器级运行时](original-sdk-runtime.md#选运行时)
 
 ---
 
 > **环境补丁代码模板**：references/jsdom-env-patches.md
-> **经验案例**：cases/jsvmp-xhr-interceptor-env-emulation.md、cases/jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox.md
-> **完整工作流**：SKILL.md「路径 B：环境伪装」段
+> **历史案例**：见 [cases/README.md](../cases/README.md)，结论只适用于其记录的版本和日期
+> **完整工作流**：[问题路由](problem-routing.md)

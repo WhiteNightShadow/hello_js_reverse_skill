@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: control-group-invalid
+expected_outcome: |
+  回答否定该结论，说明控制组失效和未执行的区别，超时不是拒绝，下一步恢复基线。

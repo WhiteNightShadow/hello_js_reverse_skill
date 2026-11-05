@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: env-diff-triage
+expected_outcome: |
+  回答不全量补丁，按实际读值筛选，先 seed 后 init，用哨兵实验确认缓存，成功只算组合成立。

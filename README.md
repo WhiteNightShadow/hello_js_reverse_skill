@@ -1,50 +1,47 @@
 # JS 逆向分析 Skill
 
-面向 Web API 通用采集、接口签名分析与改版回归的 Skill。已有协议与样本时直接验证 Node.js/Python 调用；需要页面取证时使用 Camoufox MCP 捕获网络、定位源码和调试 Hook，再交付可验证的采集程序。
+面向 Web API 采集、前端签名分析与改版回归的方法论 Skill。它回答三件事：问题在哪一层、走哪条链路、做到什么证据才算收口。站点规则不进主干，只作为待验证的案例留在 `cases/`。
+
+配套 [Camoufox MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) 捕获网络、定位源码和调试 Hook，交付可验证的采集程序。
+
+## 方法主线
+
+- **成功分四层**：能生成、被接受、命中目标、可持续。下层推不出上层，HTTP 200 和校验位正确都不代表成功。
+- **失败分六层**：传输、会话、请求形态、动态值、运行环境、服务端策略。现象不定层，对照实验才定层。
+- **诊断从重到轻，交付从轻到重**：先用最接近真实的路径证明此刻做得成，再逐个拿掉依赖；交付时选能成立的依赖最少的路线。
+- **在线实验有纪律**：先有控制组，发送前过门禁，单变量要回读实际发包，结果分类不合并，遇拒绝停止当批，结论带范围和强度。
+
+入口见 [SKILL.md](SKILL.md) 的问题路由表，完整链路见 [problem-routing.md](references/problem-routing.md)。
+
+## v3.10.0：问题路由与实验纪律
+
+- 主干从“按工具组织”改为“按问题路由”，按现象直接找到第一步和对应链路。
+- 新增对照实验、签名来源隔离、原始 SDK 运行、不透明令牌分析、参数跟踪五份方法文档。
+- 新增 `experiment-ledger.py`（门禁、台账、单变量回读）和 `opaque-token-inspect.py`（令牌批次结构分析）。
+- 清理把单站经验写成全局规则的内容，修正已失效的工具名，并由文档门禁测试防止回退。
+
+见 [v3.10.0](docs/releases/v3.10.0.md)、[公开 skill 库调研](docs/research/2026-11-public-skill-survey.md)。
 
 ## v3.9.0：真实开源案例与实操反馈
 
-- 可重复准备 KProtect VM、javascript-obfuscator CFF、CryptoJS/FingerprintJS，并通过真实 MCP 验证原始/插桩、加解密及原生 trace。
-- 对齐 MCP v1.8.0 的主世界/Frame 日志、现代语法解析、保守改写、精确 Unicode 返回及同步异常 Hook。
-- 延续“任务首次检查、后续复用、变化时局部复查”，移除旧索引重复扫描和未经验证的覆盖率描述。
+可重复准备 KProtect VM、javascript-obfuscator CFF、CryptoJS/FingerprintJS，并通过真实 MCP 验证原始/插桩、加解密及原生 trace。见 [v3.9.0](docs/releases/v3.9.0.md)、[实战经验](references/real-source-cases.md)、[准备与复现](scripts/real_cases/README.md)。
 
-见 [v3.9.0](docs/releases/v3.9.0.md)、[实战经验](references/real-source-cases.md)、[准备与复现](scripts/real_cases/README.md)。
-
-## v3.8.0：任务级检查与多轮实操迭代
-
-- 首次按任务检查，后续复用；浏览器/Frame/鉴权/SDK等相关状态变化时局部复查，避免反复审查或误清理。
-- 对齐 MCP v1.7.0 的请求差异、响应文件、哈希单位与失败诊断，按任务类型验收。
-- 采集核心增加显式结束字段、空中间页、可选重试和本次页数上限，保留既有默认语义。
-- 经过三轮独立 Agent 的真实 MCP/HTTP 实操，保存失败记录并修正；最后一轮三个产物全部通过独立验收。
-
-使用说明见 [通用采集](references/general-collection.md)、[任务级检查](references/task-preflight.md)、[v3.8.0 版本说明](docs/releases/v3.8.0.md)。
-
-## v3.7.0：通用采集与改版回归
-
-配套 MCP v1.6.0，保留现有 Skill 名称和模板路径。默认协议采集；浏览器自动化仅用于用户明确选择的交付方式。
-
-- Python 模板新增可配置 JSON API 采集：page/offset/cursor 分页、业务校验、主键去重、JSONL、页级 checkpoint 和恢复校验。
-- MCP 新增增量捕获、带截断/丢弃状态的导出，以及可选 Node.js 独立验签；修复并发响应归属、Cookie 删除和无效验签样本误通过。
-- 模板 `npm test` / `node main.js --test` 为离线测试；修复 VM 地址、location、定时器和 Python Cookie；请求默认不自动重放 POST。
-- 使用 `project-baseline.py` 保存 SDK/签名代码/fixture 哈希，`check-mcp-contract.py` 校验工具契约，依赖自检按任务模式选择。
-
-使用说明见 [通用采集指南](references/general-collection.md)，完整版本说明见 [v3.7.0](docs/releases/v3.7.0.md)。
+更早的版本见下方版本记录。
 
 ## 核心能力
 
-- **双语言算法还原**: Node.js (`crypto` / `crypto-js`) 与 Python (`hashlib` / `pycryptodome`) 双路径实现
-- **加密算法还原**: MD5/SHA/AES/DES/RSA/HMAC/Base64 等常见加密算法的纯算法复现
-- **JS 混淆还原**: OB混淆、控制流平坦化、eval打包、自定义VM/JSVMP 等混淆类型的分析策略
-- **JSVMP 行为追踪**: Hook/插桩/日志/源码级插桩四板斧（v2.5.0 新增第四板斧），从行为层面追踪 JS 虚拟机保护的签名生成链路，提供通用调查路径，实际有效性需按目标样本验证（详见专项指南）
-- **Cookie 归因分析**: `analyze_cookie_sources` 融合 HTTP Set-Cookie 与 JS document.cookie 日志，一次性解答"这个 Cookie 到底是谁写的"（v2.5.0 新增）
-- **反爬类型分档决策（v2.6.0）**：签名型（RS/Akamai）/ 行为型（TK/JY）/ 纯混淆 三类反爬的工具路径完全不同，内置顶层决策框架，避免"observer effect 破坏签名"的经典陷阱
-- **动态 Cookie 逆向**: eval首包、api预热、浏览器指纹等 Cookie 生成机制的破解
-- **WASM 逆向**: WebAssembly 加密模块的加载、环境补全和调用
-- **协议层对抗**: TLS 指纹检测、HTTP/2 强制、频率限制等协议层防护的应对
-- **反检测浏览器**: Camoufox C++ 引擎级指纹配置，用于反爬与环境依赖分析，站点可用性按实测判断
-- **单 MCP 工作流**: 统一使用 `camoufox-reverse` 完成源码搜索、Hook 注入、函数追踪、网络分析、请求拦截与反检测验证
-- **错误排查体系**: 完整的请求失败排查流程和签名值不一致排查方法论
-- **Codex/Claude Code 完整适配**: 内置 Agent 授权指令框架，确保 AI 全力协助完成分析任务
+- **问题路由**：按现象定位失败层，给出第一步、对应链路和收口标准
+- **对照实验**：控制组、来源替换、单变量回读、结果分类、结论强度
+- **签名来源隔离**：取得未使用的值，拆开出值、会话和传输，验证绑定关系与新鲜度
+- **原始 SDK 运行**：入口定位、状态回放、生命周期与读值差异，不必还原内部算法
+- **不透明令牌分析**：信封、掩码、版式和批次对比
+- **参数跟踪**：版本身份分开记录，结论带范围，换版有回归路径
+- **双语言算法还原**：Node.js (`crypto` / `crypto-js`) 与 Python (`hashlib` / `pycryptodome`) 双路径实现
+- **JS 混淆与 JSVMP**：OB 混淆、控制流平坦化、eval 打包、自定义 VM 的分析策略，实际有效性按目标样本验证
+- **Cookie 归因**：分清 HTTP Set-Cookie 与 JS 写入
+- **WASM 逆向**：WebAssembly 模块的加载、环境补全和调用
+- **协议层诊断**：用对照实验确认 TLS、HTTP/2、频率限制是否真的是原因
+- **通用采集**：分页、去重、JSONL、断点恢复
 
 ## 快速使用
 
@@ -81,76 +78,57 @@ git clone https://github.com/WhiteNightShadow/hello_js_reverse_skill.git ~/.code
 git clone https://github.com/WhiteNightShadow/hello_js_reverse_skill.git ~/.vscode/skills/hello_js_reverse_skill
 ```
 
-> 安装完成后，AI Agent 会自动读取 `SKILL.md` 获取 JS 逆向分析能力。当你在对话中涉及接口签名分析、反爬对抗、动态 Cookie、混淆 JS、WASM 或浏览器环境调试等场景时，Skill 会自动激活。
+> 安装完成后，AI Agent 会自动读取 `SKILL.md`。当你在对话中涉及接口采集、签名分析、动态 Cookie、混淆 JS、WASM 或浏览器环境调试等场景时，Skill 会自动激活。
 
 ## 项目结构
 
-
 ```
 hello_js_reverse_skill/
-├── SKILL.md                        # 技能定义（AI Agent 读取的核心文件）
-├── README.md                       # 项目文档
+├── SKILL.md                        # 技能入口：成功分层、问题路由、路线选择、实验纪律
+├── README.md
 │
-├── references/                     # 参考文档（深度背景，按需读取）
-│   ├── workflow-overview.md        # 工作流总览与解法模式决策树
-│   ├── phase-details.md            # Phase 0-5 详细操作（v3.7.0 按需读取）
-│   ├── mcp-cookbook.md             # MCP 工具场景手册（v3.7.0 按需读取）
-│   ├── mcp-tool-reference.md      # MCP 工具名迁移映射
-│   ├── experience-rules-full.md   # 经验法则完整版（v3.7.0 按需读取）
-│   ├── path-a-four-tools.md       # 路径 A 四板斧详细步骤
-│   ├── path-b-env-emulation.md    # 路径 B 环境伪装六步法
-│   ├── jsvmp-analysis.md          # JSVMP 字节码分析
-│   ├── jsvmp-source-instrumentation.md # 源码级插桩专项
-│   ├── jsdom-env-patches.md       # jsdom 环境补丁模板
-│   ├── common-pitfalls.md         # 反模式清单
-│   ├── crypto-patterns.md         # 加密算法识别与还原代码
-│   ├── obfuscation-guide.md       # JS 混淆类型识别与还原策略
-│   ├── hook-techniques.md         # Hook 技术大全
-│   ├── anti-debug.md              # 反调试对抗手册
-│   ├── environment-patch.md       # 环境补全指南
-│   ├── protocol-analysis.md       # 协议层分析
-│   └── troubleshooting.md         # 错误排查指南
+├── references/                     # 按需读取
+│   ├── problem-routing.md          # 主干：完整链路、路线阶梯、收口格式
+│   ├── controlled-experiments.md   # 对照实验与归因
+│   ├── signature-source-isolation.md # 未使用的值、绑定、新鲜度
+│   ├── original-sdk-runtime.md     # 原始 SDK 运行、状态回放、生命周期
+│   ├── opaque-token-analysis.md    # 令牌信封与版式
+│   ├── version-tracking.md         # 参数跟踪与版本归档
+│   ├── browser-evidence-contract.md # 抓包、Hook、插桩、原生追踪的证据边界
+│   ├── task-preflight.md           # 任务级检查与失效重查
+│   ├── general-collection.md       # 通用采集、恢复与基线
+│   ├── phase-details.md            # 深度分析操作清单
+│   ├── analysis-scenarios.md       # 专项场景配方
+│   ├── path-a-four-tools.md        # JSVMP 算法追踪
+│   ├── path-b-env-emulation.md     # JSVMP 环境复现
+│   ├── jsvmp-analysis.md / jsvmp-source-instrumentation.md
+│   ├── jsdom-env-patches.md / environment-patch.md
+│   ├── crypto-patterns.md / obfuscation-guide.md / transform-validation.md
+│   ├── hook-techniques.md / anti-debug.md / protocol-analysis.md
+│   ├── common-pitfalls.md / troubleshooting.md
+│   ├── mcp-tool-reference.md / mcp-tools.json
+│   └── agent-validation.md / real-source-cases.md
 │
-├── cases/                          # 经验案例库（唯一经验库）
-│   ├── README.md                   # 高频站点速查表
-│   ├── _template.md                # 新案例模板
-│   └── *.md                        # 各站点/场景案例
+├── cases/                          # 站点案例，唯一可以出现站点名的地方
+├── evals/                          # 方法层的行为回归场景，全部虚构
+├── docs/                           # 版本说明与公开方案调研
 │
-├── scripts/                        # 工具脚本
-│   ├── check-deps.sh               # 环境依赖检查（Node.js + Python）
-│   ├── sandbox-runner.js           # VM 沙箱执行器（CLI工具）
-│   ├── hook-generator.js           # Hook 代码生成器（10种Hook模板）
-│   └── crypto-identifier.js        # 加密算法识别器（密文特征分析）
+├── scripts/
+│   ├── experiment-ledger.py        # 在线门禁、尝试台账、单变量回读
+│   ├── opaque-token-inspect.py     # 令牌批次结构分析
+│   ├── project-baseline.py         # SDK/签名代码/fixture 哈希与版本身份
+│   ├── check-deps.py / check-mcp-contract.py
+│   ├── crypto-identifier.js / hook-generator.js / sandbox-runner.js
+│   └── real_cases/                 # 真实开源案例的准备与验证
 │
-├── templates/                      # 项目模板（按解法模式和语言分类）
-│   ├── node-request/               # 模式A (Node.js)：纯算法还原
-│   │   ├── main.js
-│   │   ├── utils/encrypt.js
-│   │   ├── utils/request.js
-│   │   └── package.json
-│   ├── python-request/             # 模式A (Python)：纯算法还原
-│   │   ├── main.py
-│   │   ├── utils/sign.py
-│   │   ├── utils/request.py
-│   │   ├── config/headers.json
-│   │   ├── config/keys.json
-│   │   └── requirements.txt
-│   ├── vm-sandbox/                 # 模式B：VM 沙箱执行
-│   │   ├── main.js
-│   │   ├── utils/sandbox.js
-│   │   ├── utils/request.js
-│   │   └── package.json
-│   ├── wasm-loader/                # 模式C：WASM 加载还原
-│   │   ├── main.js
-│   │   ├── utils/wasm-loader.js
-│   │   ├── utils/env-patch.js
-│   │   └── package.json
-│   └── browser-auto/               # 模式D：浏览器自动化
-│       ├── main.js
-│       └── package.json
+├── templates/
+│   ├── python-request/ / node-request/   # R1 纯算法
+│   ├── vm-sandbox/                       # R2 片段执行
+│   ├── wasm-loader/                      # WASM
+│   ├── browser-auto/                     # R6 浏览器自动化
+│   └── param-tracking/                   # 参数跟踪与实验单模板
 │
-└── examples/                       # 示例
-    └── demo-analysis.md            # 完整分析流程示例
+└── examples/demo-analysis.md
 ```
 
 ## 快速开始
@@ -182,6 +160,17 @@ node scripts/hook-generator.js --type=all
 **VM 沙箱执行**:
 ```bash
 node scripts/sandbox-runner.js obfuscated.js --extract-cookie --verbose
+```
+
+**令牌批次结构分析**:
+```bash
+python scripts/opaque-token-inspect.py samples.txt --encoding base64 --xor-align
+```
+
+**在线门禁与单变量回读**:
+```bash
+python scripts/experiment-ledger.py gate --ledger runs/ledger.jsonl --batch b1 --budget 3
+python scripts/experiment-ledger.py audit --base a.json --candidate b.json --allow x-sign
 ```
 
 ### 4. 使用项目模板
@@ -217,8 +206,8 @@ python main.py
 本 Skill 围绕 [`camoufox-reverse` MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) 服务器组织能力（Camoufox 反检测浏览器与统一 API）：
 - 源码级插桩 `instrumentation(action='install', mode="ast")` — MCP 侧 esprima 实现，挑战页可用
 - 签名安全观察 `hook_jsvmp_interpreter(mode="transparent")` — 仅 prototype getter 替换
-- Cookie 归因 `analyze_cookie_sources` — 区分 Set-Cookie 与 document.cookie
-- 响应链追踪 `navigate` 返回 `redirect_chain`/`final_status`，秒识反爬类型
+- Cookie 归因 — `network_capture` 与 Cookie Hook 配合，区分 Set-Cookie 与 document.cookie
+- 响应链追踪 `navigate` 返回 `redirect_chain`/`final_status`，首次不加 Hook 先看响应链
 
 | 核心工具 | 用途 |
 |---------|------|
@@ -242,7 +231,7 @@ python main.py
 | `export_state` / `import_state` | 保存/恢复浏览器状态 |
 | `check_environment` / `reset_browser_state` | 环境自检 / 清理残留状态 |
 
-详见 SKILL.md 的「核心武器」和「工具使用最佳实践」章节。
+证据边界见 [浏览器取证契约](references/browser-evidence-contract.md)，场景配方见 [analysis-scenarios.md](references/analysis-scenarios.md)。
 
 ## 逆向场景覆盖
 
@@ -255,16 +244,19 @@ python main.py
 | **JSVMP 虚拟机保护** | **Hook/插桩/日志分析三板斧** | **`jsvmp-analysis.md`** |
 | 自定义VM | I/O追踪/Hook解释器 | `obfuscation-guide.md` |
 | WASM加密 | 加载/环境补全/导出函数调用 | `environment-patch.md` |
-| TLS指纹 | Camoufox 反检测/curl-impersonate/curl_cffi | `protocol-analysis.md` |
+| 疑似 TLS 指纹 | 传输层诊断实验/curl_cffi | `protocol-analysis.md` |
 | HTTP/2 | Node.js http2模块/Python httpx | `protocol-analysis.md` |
-| 字体反爬 | 字体文件解析/CMAP映射 | SKILL.md |
-| WebSocket | WS消息分析/协议解析 | `mcp-cookbook.md` |
+| 字体反爬 | 字体文件解析/CMAP映射 | `analysis-scenarios.md` |
+| WebSocket | WS消息分析/协议解析 | `analysis-scenarios.md` |
 | 反调试 | debugger绕过/检测对抗 | `anti-debug.md` |
 | 环境检测 | webdriver/蜜罐/指纹 | `environment-patch.md` |
-| 反检测站点 | Cloudflare/RS/JY绕过 | SKILL.md |
+| 首屏挑战 | 响应链观察/低干扰观测 | `analysis-scenarios.md` |
 | **请求失败排查** | **Cookie/Header/时间戳/签名对比** | **`troubleshooting.md`** |
 | **通用 JSVMP 源码级插桩** | **HTTP 层源码改写 + hot_keys 指纹学习法** | **`jsvmp-source-instrumentation.md`** |
-| **Cookie 归因分析** | **HTTP Set-Cookie vs JS document.cookie 融合分析** | **SKILL.md 场景速查** |
+| **Cookie 归因分析** | **HTTP Set-Cookie vs JS document.cookie** | **`analysis-scenarios.md`** |
+| **本地值被拒** | **来源替换、读值差异、状态回放** | **`problem-routing.md`** |
+| **令牌结构** | **信封、掩码、版式、批次对比** | **`opaque-token-analysis.md`** |
+| **版本跟踪** | **身份分开记录、结论范围、换版回归** | **`version-tracking.md`** |
 
 ## 技术栈
 
@@ -288,12 +280,13 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.5.1**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩、Cookie 归因与可选 Gecko 原生属性追踪）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.8.0**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩与可选 Gecko 原生属性追踪）
 
 ## 版本记录
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.10.0 | 2026-11-05 | 问题路由与路线阶梯、对照实验与参数跟踪方法、配套脚本、清理单站全局规则和失效工具名、文档门禁测试 |
 | v3.9.0 | 2026-09-08 | 真实开源案例公开复现、现代解析/低副作用观测、精确数据与独立Agent复验 |
 | v3.8.0 | 2026-09-08 | 公开方案研究、任务级检查、三轮Agent实操反馈、证据诊断与可选分页恢复增强 |
 | v3.7.0 | 2026-09-07 | 通用采集与断点恢复、独立验签、模板修复、三平台 CI 和契约基线 |
@@ -302,7 +295,7 @@ python main.py
 | v3.5.1 | 2026-09-03 | 对齐 MCP v1.4.1 / Camoufox Reverse reverse.5；LocalStorage 覆盖迁移至 Firefox 152 LSNG，并纳入可达的 partitioned 分支，protocol 1 不变 |
 | v3.5.0 | 2026-09-03 | 对齐 MCP v1.4.0 / Camoufox Reverse reverse.4；默认保留 sandbox，新增交互式原生追踪、75 点证据边界、安全 snapshot 与 side-by-side 安装规则 |
 | v3.4.1 | 2026-07-29 | 增加 AST 源码插桩执行健康门禁；对齐 camoufox-reverse MCP v1.1.1；保持正常插桩流程不变，仅在异常时进入安全降级 |
-| v3.3.1 | 2026-04-21 | 经验法则精简：移除单站点经验（env-patch 行数阈值 / UA 矩阵 / cacheOpts 三件套），合并 evaluate_js 相关为 1 条，总数从 24 压缩到 22 条 |
+| v3.3.1 | 2026-04-21 | 经验法则精简：移除单站点经验，合并 evaluate_js 相关为 1 条，总数从 24 压缩到 22 条 |
 | v3.3.0 | 2026-04-19 | 核心层回归扩容：Phase 1-5 详细动作 + 10 个场景速查 + 经验法则回迁核心层；案例层强化（禁动清单 + UA 分支矩阵） |
 | v3.2.1 | 2026-04-19 | Phase 0.5.1 强化案例复用策略；经验法则第 11 条重写 |
 | v3.2.0 | 2026-04-18 | 移除 MCP session 依赖，Checklist 压缩到三项，cases/ 成为唯一经验库 |

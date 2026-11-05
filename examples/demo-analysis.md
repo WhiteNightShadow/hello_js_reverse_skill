@@ -17,7 +17,7 @@
 ```
 [camoufox-reverse] launch_browser()
 [camoufox-reverse] navigate(url="https://example.com/data")
-[camoufox-reverse] start_network_capture()
+[camoufox-reverse] network_capture(action='start')
 
 → 触发翻页交互
 [camoufox-reverse] click(selector=".next-page")
@@ -62,7 +62,7 @@ Headers:
 ### 读取关键代码
 
 ```
-[camoufox-reverse] get_script_source(script_url="https://example.com/static/js/utils.js")
+[camoufox-reverse] scripts(action='get', url="https://example.com/static/js/utils.js")
 ```
 
 还原后的关键代码：
@@ -80,9 +80,9 @@ function generateSign(page, timestamp) {
 
 ```
 [camoufox-reverse] inject_hook_preset(preset="xhr")
-[camoufox-reverse] set_breakpoint_via_hook(target_function="window.generateSign")
+[camoufox-reverse] hook_function(function_path="window.generateSign", mode='trace', world="main", log_args=true, log_return=true)
 [camoufox-reverse] reload()
-[camoufox-reverse] get_breakpoint_data
+[camoufox-reverse] get_trace_data(world="main")
 ```
 
 伪断点捕获：
@@ -161,5 +161,5 @@ async function fetchPage(page) {
 2. JS 源码搜索定位
 3. MD5 签名还原
 4. `get_request_initiator` 黄金路径定位
-5. `inject_hook_preset` + `set_breakpoint_via_hook` 动态验证
+5. `inject_hook_preset` + `hook_function(mode='trace')` 动态验证
 6. Node.js 纯算法模拟请求
