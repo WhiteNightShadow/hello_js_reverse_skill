@@ -184,7 +184,7 @@ python main.py
 
 本 Skill 围绕 [`camoufox-reverse` MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) 服务器组织能力（Camoufox 反检测浏览器与统一 API）：
 - 源码级插桩 `instrumentation(action='install', mode="ast")` — MCP 侧 esprima 实现，挑战页可用
-- 签名安全观察 `hook_jsvmp_interpreter(mode="transparent")` — 仅 prototype getter 替换
+- 低干扰观察 `hook_jsvmp_interpreter(mode="transparent")` — 仅替换 prototype getter，日志在页面主世界
 - Cookie 归因 — `network_capture` 与 Cookie Hook 配合，区分 Set-Cookie 与 document.cookie
 - 响应链追踪 `navigate` 返回 `redirect_chain`/`final_status`，首次不加 Hook 先看响应链
 
@@ -265,6 +265,7 @@ python main.py
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.11.1 | 2026-11-10 | JSVMP 探针日志改到页面主世界读取，配合 camoufox-reverse-mcp v1.9.3 |
 | v3.11.0 | 2026-11-10 | Skill 名称改为 `hello-js-reverse-skill`，符合 Agent Skills 命名规范，安装目录名随之调整 |
 | v3.10.0 | 2026-11-05 | 问题路由与路线阶梯、对照实验与参数跟踪方法、配套脚本、清理单站全局规则和失效工具名、文档门禁测试 |
 | v3.9.0 | 2026-09-08 | 真实开源案例公开复现、现代解析/低副作用观测、精确数据与独立Agent复验 |

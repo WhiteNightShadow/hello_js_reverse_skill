@@ -258,7 +258,7 @@ navigate(url) 不加任何 hook，看响应链和后续请求：
            监控签名容器 + compare_env 采集环境基准
 
 第三板斧：日志分析（从海量数据提取签名链路）
-  步骤 6：instrumentation(action='log') + evaluate_js("window.__mcp_jsvmp_log || []") + get_console_logs
+  步骤 6：instrumentation(action='log') + evaluate_js("window.__mcp_jsvmp_log || []", world="main") + get_console_logs
            → 多维度过滤
   步骤 7：反向追踪法 — 从已知签名值反向搜索首次出现位置
   步骤 8：evaluate_js 验证提取的算法，对比签名结果
