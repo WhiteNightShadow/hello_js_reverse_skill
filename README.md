@@ -26,8 +26,9 @@
 在你的 AI 编码工具（Cursor / Claude Code / codex 等）的对话框中输入：
 
 ```
-帮我安装下这个skill：hello_js_reverse_skill
+帮我安装下这个skill：hello-js-reverse-skill
 项目地址：https://github.com/WhiteNightShadow/hello_js_reverse_skill
+安装目录名：hello-js-reverse-skill
 ```
 
 AI 会自动完成下载、配置，并在后续 JS 逆向相关任务中自动调用该 Skill。
@@ -39,27 +40,29 @@ AI 会自动完成下载、配置，并在后续 JS 逆向相关任务中自动�
 **Cursor：**
 
 ```bash
-git clone https://github.com/WhiteNightShadow/hello_js_reverse_skill.git ~/.cursor/skills/hello_js_reverse_skill
+git clone https://github.com/WhiteNightShadow/hello_js_reverse_skill.git ~/.cursor/skills/hello-js-reverse-skill
 ```
 
 **Codex：**
 
 ```bash
-git clone https://github.com/WhiteNightShadow/hello_js_reverse_skill.git ~/.codex/skills/hello_js_reverse_skill
+git clone https://github.com/WhiteNightShadow/hello_js_reverse_skill.git ~/.codex/skills/hello-js-reverse-skill
 ```
 
 **VSCode（Copilot / Cline 等插件）：**
 
 ```bash
-git clone https://github.com/WhiteNightShadow/hello_js_reverse_skill.git ~/.vscode/skills/hello_js_reverse_skill
+git clone https://github.com/WhiteNightShadow/hello_js_reverse_skill.git ~/.vscode/skills/hello-js-reverse-skill
 ```
 
+> 目录名需与 `SKILL.md` 里的 `name` 一致，都是 `hello-js-reverse-skill`；仓库名仍是 `hello_js_reverse_skill`，所以克隆时要写明目录名。v3.10.0 及更早版本装在 `hello_js_reverse_skill` 目录的，更新后把目录改名为 `hello-js-reverse-skill`。
+>
 > 安装完成后，AI Agent 会自动读取 `SKILL.md`。当你在对话中涉及接口采集、签名分析、动态 Cookie、混淆 JS、WASM 或浏览器环境调试等场景时，Skill 会自动激活。
 
 ## 项目结构
 
 ```
-hello_js_reverse_skill/
+hello-js-reverse-skill/
 ├── SKILL.md                        # 技能入口：成功分层、问题路由、路线选择、实验纪律
 ├── README.md
 │
@@ -117,7 +120,7 @@ bash scripts/check-deps.sh
 
 ### 2. 作为 Cursor Skill 使用
 
-将本目录放置到 `.cursor/skills/` 下，AI Agent 会自动读取 `SKILL.md` 获取逆向分析能力。
+将本目录以 `hello-js-reverse-skill` 为名放置到 `.cursor/skills/` 下，AI Agent 会自动读取 `SKILL.md` 获取逆向分析能力。
 
 ### 3. 工具脚本
 
@@ -262,6 +265,7 @@ python main.py
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.11.0 | 2026-11-10 | Skill 名称改为 `hello-js-reverse-skill`，符合 Agent Skills 命名规范，安装目录名随之调整 |
 | v3.10.0 | 2026-11-05 | 问题路由与路线阶梯、对照实验与参数跟踪方法、配套脚本、清理单站全局规则和失效工具名、文档门禁测试 |
 | v3.9.0 | 2026-09-08 | 真实开源案例公开复现、现代解析/低副作用观测、精确数据与独立Agent复验 |
 | v3.8.0 | 2026-09-08 | 公开方案研究、任务级检查、三轮Agent实操反馈、证据诊断与可选分页恢复增强 |

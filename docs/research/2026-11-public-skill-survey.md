@@ -44,4 +44,4 @@
 - 中文论坛、公众号、知识星球未覆盖。
 - Anthropic 官方最佳实践页未直接读到，读的是第三方仓库里的副本。
 
-后续可做：把触发词集分成训练集和测试集，用真实运行优化 description（`hello_js_reverse_skill` 的名字含下划线，不符合 agentskills 规范，为兼容已有安装暂时保留）。
+后续可做：把触发词集分成训练集和测试集，用真实运行优化 description（`hello_js_reverse_skill` 的名字含下划线，不符合 agentskills 规范，v3.11.0 已改为 `hello-js-reverse-skill`）。

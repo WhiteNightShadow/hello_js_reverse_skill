@@ -1,5 +1,5 @@
 ---
-name: hello_js_reverse_skill
+name: hello-js-reverse-skill
 description: >
   通用 Web API 采集与前端签名问题的方法论。只要任务涉及抓接口或写 Node/Python 协议程序、sign/token/动态 Cookie/自定义头、
   本地生成的值服务端不认、HTTP 200 却是业务错误或空数据、浏览器能过本地不过、SDK 或接口改版失效、
@@ -7,7 +7,7 @@ description: >
   配套 Camoufox MCP 取证，交付可验证的采集程序，支持分页、断点续采和改版回归。
   仅用于自有或已授权接口；微信小程序 wxapkg 解包使用对应小程序技能。
 metadata:
-  version: "3.10.0"
+  version: "3.11.0"
   mcp-compatible: "1.8.0（旧工作流兼容 1.6.x / 1.7.x；新参数需对应工具 schema）"
 ---
 
@@ -148,7 +148,7 @@ metadata:
 
 ## 更新记录
 
+- v3.11.0（2026-11-10）：Skill 名称改为 `hello-js-reverse-skill`，符合 Agent Skills 命名规范；安装目录名需与名称一致，模板目录和引用路径不变。
 - v3.10.0（2026-11-05）：主干改为问题路由与路线阶梯；新增对照实验、签名来源隔离、原始 SDK 运行、不透明令牌、参数跟踪方法与配套脚本；吸收公开 skill 库的并联闸门、概率门、A/A 对照等方法；工具级细节移入取证契约；清理把单站经验写成全局规则的内容和已失效的工具名。
 - v3.9.0（2026-09-08）：真实开源 VM/CFF/CryptoJS/FingerprintJS 本地案例；公开准备与 MCP 验证脚本；吸收多轮实操的主世界日志、保守插桩、精确字符串、异常 Hook 和原生快照归属经验。
-- v3.8.0（2026-09-08）：任务级首检与失效重查；响应文件/请求差异证据；按多轮独立 Agent 反馈完善诊断、哈希单位和分页恢复。
-- 历史版本与详细差异见 Git tags / Releases。保留现有 Skill 名称和模板目录，避免已有安装与引用失效。
+- 历史版本与详细差异见 Git tags / Releases。模板目录和引用路径保持不变，避免已有引用失效。
