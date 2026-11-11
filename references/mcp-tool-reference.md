@@ -1,6 +1,15 @@
-# MCP v1.8.0 工具契约
+# MCP v1.9.4 工具契约
 
-配套 Skill v3.10.0。完整参数快照见 [mcp-tools.json](mcp-tools.json)，实际执行时优先读取已安装 MCP 的工具定义。不要将快照的新参数发送给旧版本。
+配套 Skill v3.12.0。完整参数快照（MCP v1.9.4）见 [mcp-tools.json](mcp-tools.json)，实际执行时优先读取已安装 MCP 的工具定义。不要将快照的新参数发送给旧版本。
+
+## v1.9.x 新增与兼容行为
+
+| 版本 | 变化 | 兼容说明 |
+|---|---|---|
+| v1.9.4 | `instrumentation(action="install")` 新增 `tap_stage_calls`，把平坦化 VMP 的分发调用记录成逐状态的 `tap_stage` 事件，日志摘要加 `hot_stages` | 默认关闭；用法和边界见 [阶段对照](jsvmp-source-instrumentation.md#45-平坦化分发的阶段对照)；旧版本不认这个参数 |
+| v1.9.3 | `hook_jsvmp_interpreter` 的探针装在页面主世界 | 日志用 `evaluate_js(..., world="main")` 读；更早的版本装在隔离世界，页面脚本的记录一直是空的 |
+| v1.9.1 | `launch_browser` 没传的参数改用服务端启动参数（`--headless`、`--os` 等），传了的优先 | 快照里这几个参数不再写默认值 |
+| v1.9.0 | 支持用 `uvx` 按标签安装，新增 `--version` | 工具和参数不变 |
 
 ## v1.8.0 观测与返回契约
 

@@ -7,8 +7,8 @@ description: >
   配套 Camoufox MCP 取证，交付可验证的采集程序，支持分页、断点续采和改版回归。
   仅用于自有或已授权接口；微信小程序 wxapkg 解包使用对应小程序技能。
 metadata:
-  version: "3.11.1"
-  mcp-compatible: "1.8.0（旧工作流兼容 1.6.x / 1.7.x；新参数需对应工具 schema；hook_jsvmp_interpreter 需 1.9.3）"
+  version: "3.12.0"
+  mcp-compatible: "1.8.0（旧工作流兼容 1.6.x / 1.7.x；新参数需对应工具 schema；hook_jsvmp_interpreter 需 1.9.3；tap_stage_calls 需 1.9.4）"
 ---
 
 # 通用采集与签名分析
@@ -148,7 +148,7 @@ metadata:
 
 ## 更新记录
 
+- v3.12.0（2026-11-10）：新增平坦化分发的阶段对照，用 MCP v1.9.4 的 `tap_stage_calls` 记录浏览器和本地补环境的状态序列，找第一个分叉的状态；MCP 工具快照更新到 v1.9.4。
 - v3.11.1（2026-11-10）：JSVMP 探针日志改用 `evaluate_js(..., world="main")` 读取，配合 MCP v1.9.3 把探针装在页面主世界。
 - v3.11.0（2026-11-10）：Skill 名称改为 `hello-js-reverse-skill`，符合 Agent Skills 命名规范；安装目录名需与名称一致，模板目录和引用路径不变。
-- v3.10.0（2026-11-05）：主干改为问题路由与路线阶梯；新增对照实验、签名来源隔离、原始 SDK 运行、不透明令牌、参数跟踪方法与配套脚本；吸收公开 skill 库的并联闸门、概率门、A/A 对照等方法；工具级细节移入取证契约；清理把单站经验写成全局规则的内容和已失效的工具名。
 - 历史版本与详细差异见 Git tags / Releases。模板目录和引用路径保持不变，避免已有引用失效。

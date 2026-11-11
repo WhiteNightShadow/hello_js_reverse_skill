@@ -198,7 +198,7 @@ python main.py
 | `get_trace_data` | 读取或清理函数 Trace，可按 world 与 Frame 过滤 |
 | `inject_hook_preset` | 一键预设 Hook（xhr/fetch/crypto/websocket/debugger_bypass/cookie/runtime_probe） |
 | `hook_jsvmp_interpreter` | 一键插桩 JSVMP 解释器（proxy / transparent 两种模式） |
-| `instrumentation(action='install'\|'log'\|'stop'\|'reload')` | 源码级插桩：HTTP 层改写 VMP + 日志 + 重载 |
+| `instrumentation(action='install'\|'log'\|'stop'\|'reload')` | 源码级插桩：HTTP 层改写 VMP + 日志 + 重载；`tap_stage_calls` 按状态记录平坦化分发（MCP v1.9.4） |
 | `network_capture(action='start'\|'stop')` | 网络捕获（支持 capture_body） |
 | `list_network_requests` / `get_network_request` | 列出/获取捕获的请求 |
 | `get_request_initiator` | 获取发起请求的 JS 调用栈（黄金路径） |
@@ -259,12 +259,13 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.8.0**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩与可选 Gecko 原生属性追踪）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.9.4**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩与可选 Gecko 原生属性追踪）
 
 ## 版本记录
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.12.0 | 2026-11-10 | 平坦化分发的阶段对照（`tap_stage_calls`），MCP 工具快照更新到 v1.9.4 |
 | v3.11.1 | 2026-11-10 | JSVMP 探针日志改到页面主世界读取，配合 camoufox-reverse-mcp v1.9.3 |
 | v3.11.0 | 2026-11-10 | Skill 名称改为 `hello-js-reverse-skill`，符合 Agent Skills 命名规范，安装目录名随之调整 |
 | v3.10.0 | 2026-11-05 | 问题路由与路线阶梯、对照实验与参数跟踪方法、配套脚本、清理单站全局规则和失效工具名、文档门禁测试 |

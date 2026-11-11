@@ -2,7 +2,7 @@
 
 目录：[1. 为什么需要源码级插桩](#1-为什么需要源码级插桩) · [2. 两种改写模式：regex vs AST](#2-两种改写模式regex-vs-ast) · [改写状态与运行时健康诊断](#改写状态与运行时健康诊断) · [3. 按需操作骨架](#3-按需操作骨架8-步) · [4. 进阶技巧](#4-进阶技巧) · [5. 常见问题与陷阱](#5-常见问题与陷阱) · [6. 源码级插桩的还原决策](#6-源码级插桩的还原决策) · [7. 参考](#7-参考)
 
-> **Skill v3.10.0 / MCP v1.8.0**。当前执行接口以 `instrumentation(action=...)` 为准；旧版 MCP 调用前检查实际工具 schema。
+> **Skill v3.12.0 / MCP v1.8.0**（4.5 的阶段对照需要 MCP v1.9.4）。当前执行接口以 `instrumentation(action=...)` 为准；旧版 MCP 调用前检查实际工具 schema。
 >
 > 与 `jsvmp-analysis.md` 的第一/二/三板斧互补——前三板斧诊断"VM 看外界 / 外界看 VM"，本文档讲解"VM 看自己"。
 
@@ -355,6 +355,41 @@ instrumentation(action="log", tag_filter="vmp1", limit=300)
 evaluate_js(expression="window.__mcp_runtime_log || []", world="main")  # 本地按 type 过滤
 ```
 
+### 4.5 平坦化分发的阶段对照
+
+控制流平坦化的 VM 常把每个状态都交给同一个分发调用，例如 `return l.apply(this, [3].concat(Array.prototype.slice.call(arguments)))`，`3` 是状态号。本地补环境算出的值和浏览器不同、读到的属性又对不出差别时，可以把两边的状态序列逐条比对，第一个不同的状态就是分叉点。需要 MCP v1.9.4 起的 `tap_stage_calls`。
+
+```
+instrumentation(action="install", url_pattern="**/<VMP文件>-*.js", mode="ast", tag="stage",
+                tap_stage_calls=True, rewrite_member_access=False, rewrite_calls=False)
+instrumentation(action="reload")
+instrumentation(action="status")   # total_edits 是改写的分发调用数
+触发一次业务操作，记下这次的输入（种子、时间戳等）
+instrumentation(action="log", tag_filter="stage", type_filter="tap_stage", limit=5000)
+→ entries 依次带状态号 p、argc、前三个参数和返回值的预览；summary.hot_stages 是各状态的次数
+instrumentation(action="log", tag_filter="stage", type_filter="tap_stage", key_filter="3")  # 按状态号筛，子串匹配
+```
+
+- `total_edits` 为 0 说明文件里没有这种写法，回到源码确认分发形态。`last_mode_used` 显示 `ast (stage taps only)` 说明文件没解析成功，只做了阶段插桩，原因在 `last_error`。
+- 只匹配上面这一种写法，其他写法原样保留。`mode="regex"` 和解析失败的文件没有语法树核对，字符串里同样的文字也会被改写，优先用 `mode="ast"`。
+- 事件在状态返回时记录，嵌套的状态排在前面；抛出异常的状态不记录。两边按同样的规则记录，再按顺序比状态号和返回值。
+- 时间戳、随机数这类输入两边要固定成同一份，否则序列从头就不同。找到分叉的状态后，再用 `tap_get` 或补丁日志看这个状态读了什么。
+
+本地侧可以在加载 SDK 源码前做同样的替换，按同样的规则记录：
+
+```js
+const STAGE = /return\s+([A-Za-z_$][\w$]*)\.apply\(\s*this\s*,\s*\[\s*(\d+)\s*\]\s*\.concat\(\s*Array\.prototype\.slice\.call\(\s*arguments\s*\)\s*\)\s*\)/g;
+const preview = v => v === null ? 'null' : typeof v === 'object' ? '[object]'
+  : typeof v === 'function' ? '[fn]' : (s => s.length > 120 ? s.slice(0, 120) + '...' : s)(String(v));
+const stages = [];
+globalThis.__stage = function (p, fn, self, args) {
+  const r = Reflect.apply(fn, self, [p].concat(Array.prototype.slice.call(args)));
+  stages.push([p, args.length, preview(r)]);  // 与浏览器日志的 [p, argc, ret] 逐条比对
+  return r;
+};
+source = source.replace(STAGE, 'return __stage($2, $1, this, arguments)');
+```
+
 ---
 
 ## 5. 常见问题与陷阱
@@ -423,4 +458,4 @@ evaluate_js(expression="window.__mcp_runtime_log || []", world="main")  # 本地
 - [骨架案例](../cases/universal-vmp-source-instrumentation.md)：模板，需当前适用性验证
 - [真实上游本地案例](../references/real-source-cases.md)：VM/CFF/CryptoJS/FingerprintJS 的来源与证据边界
 - [准备与验证脚本说明](../scripts/real_cases/README.md)：按需执行，本地通过不等于商业站点验证
-- [MCP 上游](https://github.com/WhiteNightShadow/camoufox-reverse-mcp)（本指南对齐 v1.8.0）
+- [MCP 上游](https://github.com/WhiteNightShadow/camoufox-reverse-mcp)（本指南对齐 v1.8.0，4.5 节对齐 v1.9.4）

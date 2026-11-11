@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "mcp_version": "1.8.0",
+  "mcp_version": "1.9.4",
   "tools": [
     {
       "name": "check_environment",
@@ -558,6 +558,11 @@
             "title": "Rewrite Calls",
             "type": "boolean"
           },
+          "tap_stage_calls": {
+            "default": false,
+            "title": "Tap Stage Calls",
+            "type": "boolean"
+          },
           "max_rewrites": {
             "default": 20000,
             "title": "Max Rewrites",
@@ -694,43 +699,36 @@
       "parameters": {
         "properties": {
           "headless": {
-            "default": false,
-            "title": "Headless",
-            "type": "boolean"
+            "type": "boolean",
+            "title": "Headless"
           },
           "os_type": {
-            "default": "auto",
-            "title": "Os Type",
-            "type": "string"
+            "type": "string",
+            "title": "Os Type"
           },
           "locale": {
-            "default": "auto",
-            "title": "Locale",
-            "type": "string"
+            "type": "string",
+            "title": "Locale"
           },
           "proxy": {
             "type": "string",
             "title": "Proxy"
           },
           "humanize": {
-            "default": false,
-            "title": "Humanize",
-            "type": "boolean"
+            "type": "boolean",
+            "title": "Humanize"
           },
           "geoip": {
-            "default": false,
-            "title": "Geoip",
-            "type": "boolean"
+            "type": "boolean",
+            "title": "Geoip"
           },
           "block_images": {
-            "default": false,
-            "title": "Block Images",
-            "type": "boolean"
+            "type": "boolean",
+            "title": "Block Images"
           },
           "block_webrtc": {
-            "default": false,
-            "title": "Block Webrtc",
-            "type": "boolean"
+            "type": "boolean",
+            "title": "Block Webrtc"
           },
           "enable_trace": {
             "default": false,
