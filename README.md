@@ -289,6 +289,6 @@ python main.py
 
 ## 许可证
 
-本仓库以 [GNU Affero General Public License v3.0](LICENSE)（AGPL-3.0）发布。Copyright © 2026 WhiteNightShadow。
+本仓库以 [Apache License 2.0](LICENSE) 发布。Copyright © 2026 WhiteNightShadow。
 
 `scripts/real_cases/` 里自写的准备与验证脚本、测试输入按该目录的 [LICENSE](scripts/real_cases/LICENSE) 以 CC0-1.0 放弃权利；按配方下载的上游源码和依赖沿用各自原有的许可证。
