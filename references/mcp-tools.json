@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "mcp_version": "1.9.4",
+  "mcp_version": "1.10.0",
   "tools": [
     {
       "name": "check_environment",
@@ -44,6 +44,17 @@
             },
             "type": "array",
             "title": "Properties"
+          },
+          "output_path": {
+            "type": "string",
+            "title": "Output Path"
+          },
+          "sections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sections"
           }
         },
         "title": "compare_envArguments",
@@ -554,7 +565,7 @@
             "type": "boolean"
           },
           "rewrite_calls": {
-            "default": true,
+            "default": false,
             "title": "Rewrite Calls",
             "type": "boolean"
           },
@@ -625,7 +636,7 @@
             "title": "Filter Object Names"
           },
           "max_file_size": {
-            "default": 200000,
+            "default": 2000000,
             "title": "Max File Size",
             "type": "integer"
           },
@@ -650,6 +661,33 @@
           "frame_index": {
             "type": "integer",
             "title": "Frame Index"
+          },
+          "after_seq": {
+            "type": "integer",
+            "title": "After Seq"
+          },
+          "seq_window": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Seq Window"
+          },
+          "stage": {
+            "type": "integer",
+            "title": "Stage"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_path": {
+            "type": "string",
+            "title": "Source Path"
+          },
+          "output_path": {
+            "type": "string",
+            "title": "Output Path"
           }
         },
         "required": [
@@ -1085,6 +1123,56 @@
       }
     },
     {
+      "name": "stage_break",
+      "parameters": {
+        "properties": {
+          "action": {
+            "default": "list",
+            "title": "Action",
+            "type": "string"
+          },
+          "p": {
+            "type": "integer",
+            "title": "P"
+          },
+          "capture": {
+            "default": "args_ret",
+            "title": "Capture",
+            "type": "string"
+          },
+          "limit": {
+            "default": 0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "depth": {
+            "default": 2,
+            "title": "Depth",
+            "type": "integer"
+          },
+          "max_items": {
+            "default": 50,
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "frame_url": {
+            "type": "string",
+            "title": "Frame Url"
+          },
+          "frame_name": {
+            "type": "string",
+            "title": "Frame Name"
+          },
+          "frame_index": {
+            "type": "integer",
+            "title": "Frame Index"
+          }
+        },
+        "title": "stage_breakArguments",
+        "type": "object"
+      }
+    },
+    {
       "name": "take_screenshot",
       "parameters": {
         "properties": {
@@ -1173,6 +1261,39 @@
           }
         },
         "title": "trace_property_accessArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "trace_session",
+      "parameters": {
+        "properties": {
+          "action": {
+            "default": "status",
+            "title": "Action",
+            "type": "string"
+          },
+          "screenshots": {
+            "default": true,
+            "title": "Screenshots",
+            "type": "boolean"
+          },
+          "snapshots": {
+            "default": true,
+            "title": "Snapshots",
+            "type": "boolean"
+          },
+          "sources": {
+            "default": true,
+            "title": "Sources",
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          }
+        },
+        "title": "trace_sessionArguments",
         "type": "object"
       }
     },

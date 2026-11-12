@@ -105,6 +105,7 @@ hello-js-reverse-skill/
 │   ├── vm-sandbox/                       # R2 片段执行
 │   ├── wasm-loader/                      # WASM
 │   ├── browser-auto/                     # R6 浏览器自动化
+│   ├── env-bundle/                       # 浏览器环境包套到 jsdom
 │   └── param-tracking/                   # 参数跟踪与实验单模板
 │
 └── examples/demo-analysis.md
@@ -163,6 +164,7 @@ python scripts/experiment-ledger.py audit --base a.json --candidate b.json --all
 | 动态 Cookie | Node.js | `templates/vm-sandbox/` | 服务端返回 JS 生成 Cookie |
 | WASM 加密 | Node.js | `templates/wasm-loader/` | 加密在 .wasm 中实现 |
 | TLS/环境依赖 | Node.js | `templates/browser-auto/` | 无法脱离浏览器环境 |
+| 环境对齐 | Node.js | `templates/env-bundle/` | 把 `compare_env(output_path=...)` 导出的环境包套到 jsdom（MCP v1.10.0） |
 
 **Node.js 项目：**
 ```bash
@@ -196,15 +198,15 @@ python main.py
 | `evaluate_js(..., world='isolated'\|'main')` | 执行 JS；默认隔离上下文保持兼容，可显式进入页面主世界并按 Frame 定位 |
 | `hook_function(mode='intercept'\|'trace')` | 自定义 Hook / 函数追踪；可选择主世界与 Frame，跨导航或有界等待动态挂载需设置 `persistent=True` |
 | `get_trace_data` | 读取或清理函数 Trace，可按 world 与 Frame 过滤 |
-| `inject_hook_preset` | 一键预设 Hook（xhr/fetch/crypto/websocket/debugger_bypass/cookie/runtime_probe） |
+| `inject_hook_preset` | 一键预设 Hook（xhr/fetch/crypto/websocket/debugger_bypass/cookie/runtime_probe）；MCP v1.10.0 起装在页面主世界，日志用 `world='main'` 读 |
 | `hook_jsvmp_interpreter` | 一键插桩 JSVMP 解释器（proxy / transparent 两种模式） |
-| `instrumentation(action='install'\|'log'\|'stop'\|'reload')` | 源码级插桩：HTTP 层改写 VMP + 日志 + 重载；`tap_stage_calls` 按状态记录平坦化分发（MCP v1.9.4） |
+| `instrumentation(action='install'\|'log'\|'stop'\|'reload'\|'rewrite_source')` | 源码级插桩：HTTP 层改写 VMP + 日志 + 重载；`tap_stage_calls` 按状态记录平坦化分发（MCP v1.9.4）；日志按 `seq`/`stage` 切片、`rewrite_source` 离线改写本地源码（MCP v1.10.0） |
 | `network_capture(action='start'\|'stop')` | 网络捕获（支持 capture_body） |
 | `list_network_requests` / `get_network_request` | 列出/获取捕获的请求 |
 | `get_request_initiator` | 获取发起请求的 JS 调用栈（黄金路径） |
 | `intercept_request` | 拦截/修改/Mock 网络请求 |
 | `cookies(action='get'\|'set'\|'delete')` | Cookie 管理 |
-| `compare_env` | 采集固定 JS 环境基线；其他属性需通过 `properties` 或分批 `evaluate_js` 扩展 |
+| `compare_env` | 采集 JS 环境基线；其他属性需通过 `properties` 或分批 `evaluate_js` 扩展；MCP v1.10.0 起 `output_path` 导出完整环境包 |
 | `trace_property_access(action=...)` | reverse.5 的 77 点 Gecko 原生追踪（旧兼容构建为 75 点）；支持 start→操作→stop、kind/site 过滤和覆盖边界 |
 | `verify_signer_offline` | 用真实样本离线验证签名代码 |
 | `export_state` / `import_state` | 保存/恢复浏览器状态 |
@@ -259,12 +261,13 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.9.4**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩与可选 Gecko 原生属性追踪）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.10.0**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩与可选 Gecko 原生属性追踪）
 
 ## 版本记录
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.13.0 | 2026-11-12 | 配合 MCP v1.10.0：插桩默认值、日志切片、离线插桩、preset 主世界；新增环境包套用模板 `templates/env-bundle/` |
 | v3.12.0 | 2026-11-10 | 平坦化分发的阶段对照（`tap_stage_calls`），MCP 工具快照更新到 v1.9.4 |
 | v3.11.1 | 2026-11-10 | JSVMP 探针日志改到页面主世界读取，配合 camoufox-reverse-mcp v1.9.3 |
 | v3.11.0 | 2026-11-10 | Skill 名称改为 `hello-js-reverse-skill`，符合 Agent Skills 命名规范，安装目录名随之调整 |

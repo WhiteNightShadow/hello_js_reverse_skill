@@ -27,6 +27,7 @@ jobs:
       - run: npm --prefix templates/vm-sandbox test
       - run: npm --prefix templates/wasm-loader test
       - run: npm --prefix templates/browser-auto test
+      - run: npm --prefix templates/env-bundle test
       - run: node --test tests/test-sandbox.js tests/test-request.js
       - run: python templates/python-request/test.py
       - run: python -m unittest discover -s tests -p 'test_*.py'

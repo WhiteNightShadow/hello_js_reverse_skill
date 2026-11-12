@@ -1,0 +1,16 @@
+{
+  "name": "camoufox-reverse-env-bundle",
+  "version": "1.0.0",
+  "description": "Camoufox逆向 - 把浏览器环境包套到 jsdom",
+  "main": "apply.js",
+  "scripts": {
+    "start": "node main.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "jsdom": "^24.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

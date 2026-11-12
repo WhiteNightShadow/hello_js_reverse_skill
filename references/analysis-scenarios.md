@@ -204,7 +204,7 @@ Cookie 归因路径：
 ### 效率原则
 
 - 优先用 `get_request_initiator` 而非 `search_code` 定位签名函数
-- 优先用 `inject_hook_preset` 而非手写 Hook
+- 优先用 `inject_hook_preset` 而非手写 Hook。MCP v1.10.0 起 preset 装在页面主世界，能记到页面自己的请求和 cookie 读写，日志用 `evaluate_js("window.__mcp_xhr_log || []", world="main")` 这类写法读；页面也能察觉被替换的函数，签名型反爬页面上不要用，`remove_hooks` 可以还原
 - 优先用 `instrumentation(action='install')` 而非逐个 `hook_function`
 - 分析产物第一时间写入 `config/` 文件，不要内联长字符串
 - `inject_hook_preset` 默认持久化；`hook_function` 需要跨导航时显式传 `persistent=True`

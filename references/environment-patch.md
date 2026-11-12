@@ -387,6 +387,21 @@ function createFullBrowserEnv(options = {}) {
 }
 ```
 
+## 7. 套用浏览器导出的环境包
+
+MCP v1.10.0 起 `compare_env(output_path="env.json")` 在隔离世界里采一份浏览器环境：navigator 的全部 getter（含 plugins、mimeTypes）、screen、window 尺寸和全局名、getComputedStyle 的属性和值、CSS 声明原型名和 enumerable 标志、canvas 参照图的 toDataURL、WebGL 参数和扩展、audio、storage 键名、about:blank iframe 与顶层的差异、时区。`templates/env-bundle/` 把它套到 jsdom：
+
+```js
+const { applyEnvBundle } = require('./templates/env-bundle/apply');
+const report = applyEnvBundle(dom.window, JSON.parse(fs.readFileSync('env.json', 'utf8')));
+// report.applied / report.skipped / report.notes / report.missingGlobals
+```
+
+- 只套包里真实采到的值。navigator 和 screen 的值定义成原型上的 getter，和浏览器一样实例自身没有属性；plugins 和 mimeTypes 按包里的列表重建。
+- CSS 只补声明原型上缺的属性名和 enumerable 标志；计算样式的值在 `bundle.css.values`，按目标实际读到的再补。jsdom 的 style 能 for...in 出的名字比浏览器多（实测 1853 对 1172），模板去不掉多出来的，目标数这个值时要单独处理。
+- canvas 像素、WebGL 绘制、音频渲染和时区不在模板里伪造：参照图和目标自己画的内容不同；时区要在启动 Node 时设 `TZ`。storage 只有键名和值长度。
+- 套完先用插桩日志核对目标实际读到的值，再看 `report.skipped`，不要为了凑全把没采到的值写死。
+
 ## MCP 辅助确定环境需求
 
 ```

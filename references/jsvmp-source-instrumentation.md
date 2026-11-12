@@ -2,7 +2,7 @@
 
 目录：[1. 为什么需要源码级插桩](#1-为什么需要源码级插桩) · [2. 两种改写模式：regex vs AST](#2-两种改写模式regex-vs-ast) · [改写状态与运行时健康诊断](#改写状态与运行时健康诊断) · [3. 按需操作骨架](#3-按需操作骨架8-步) · [4. 进阶技巧](#4-进阶技巧) · [5. 常见问题与陷阱](#5-常见问题与陷阱) · [6. 源码级插桩的还原决策](#6-源码级插桩的还原决策) · [7. 参考](#7-参考)
 
-> **Skill v3.12.0 / MCP v1.8.0**（4.5 的阶段对照需要 MCP v1.9.4）。当前执行接口以 `instrumentation(action=...)` 为准；旧版 MCP 调用前检查实际工具 schema。
+> **Skill v3.13.0 / MCP v1.8.0**（4.5 的阶段对照需要 MCP v1.9.4；日志切片、`rewrite_source` 离线改写和跳过原因需要 v1.10.0）。当前执行接口以 `instrumentation(action=...)` 为准；旧版 MCP 调用前检查实际工具 schema。
 >
 > 与 `jsvmp-analysis.md` 的第一/二/三板斧互补——前三板斧诊断"VM 看外界 / 外界看 VM"，本文档讲解"VM 看自己"。
 
@@ -93,9 +93,9 @@ __mcp_prepare_method(obj, 'method', 'vmp1')([arg]);
 
 | 情况 | 选 | 原因 |
 |------|-----|-----|
-| 首次分析某个 VMP | **选择性 AST** | 先按当前源码定位属性，使用 `rewrite_calls=False`，需要调用证据时再扩大 |
+| 首次分析某个 VMP | **选择性 AST** | 先按当前源码定位属性，使用 `rewrite_calls=False`（MCP v1.10.0 起是默认值），需要调用证据时再扩大；调用改写会让被调函数读到的 `caller` 变成 null、递归深度下降，指纹可能跟着变 |
 | 整个脚本属于 regex 白名单，只需 bracket 读取 | regex | 无解析器依赖，仍需对照验证 |
-| 大文件 | **选择性 AST 或保留原文** | 默认 `max_file_size=200000` 字节，`on_oversized="selective"` 无过滤器时跳过；不因体积直接换 regex |
+| 大文件 | **选择性 AST 或保留原文** | 默认 `max_file_size` 在 MCP v1.10.0 起是 2000000 字节（更早是 200000），`on_oversized="selective"` 无过滤器时跳过；被跳过的文件在 `status` 和 `log` 的 `skipped_files` 里列出原因和建议值；不因体积直接换 regex |
 | 关心 VMP 调了哪些方法 | **AST** | regex 不生成 tap_method / tap_call |
 | 关心 VMP 读了哪些属性 | 通常 AST | 两种模式的语法范围不同，日志只说明实际捕获的读取 |
 
@@ -291,7 +291,7 @@ Actions (hot_functions — VMP 调用了哪些函数):
 
 Step 4 的读取配置不会产生方法/函数事件。确需这两类证据时，停止对应 route，按当前源码调整过滤器并打开 `rewrite_calls=True`，再有意采样。不要为了获得所有摘要直接扩大到全文件。
 
-SDK 在 iframe 中时，上述 `log` 调用都需加相同的 Frame 选择器，例如 `frame_name="sdk"`（替换为实测名称）。查看返回的 `world`、`frame`、`execution_backend` 和 `warning`。`possibly_capped=True` 表示所选 Frame 的原始缓冲区可能达到 20,000 条上限；`truncated=True` 只表示过滤后记录超过本次 `limit`，摘要统计的是过滤后的已保存记录。增大 `limit` 不能补回未采集事件，缺失事件不能作否定证据。
+SDK 在跨域 iframe 中时，上述 `log` 调用都需加相同的 Frame 选择器，例如 `frame_name="sdk"`（替换为实测名称）。MCP v1.10.0 起同源子 frame 里的事件写进顶层日志，带 `frame_url`、`frame_depth`，页面删掉 iframe 后也还在，不用再选 Frame。查看返回的 `world`、`frame`、`execution_backend` 和 `warning`。`possibly_capped=True` 表示所选 Frame 的原始缓冲区可能达到 20,000 条上限；`truncated=True` 只表示过滤后记录超过本次 `limit`，摘要统计的是过滤后的已保存记录。增大 `limit` 不能补回未采集事件，缺失事件不能作否定证据。MCP v1.10.0 起每条事件都带 `seq`，`dropped` 给出满 20000 条后丢掉的条数；要取一段时用 `after_seq` 往后翻页（返回 `next_after_seq`）或 `seq_window=[起, 止]`，不要拉全量再本地筛。
 
 ---
 
@@ -390,6 +390,10 @@ globalThis.__stage = function (p, fn, self, args) {
 source = source.replace(STAGE, 'return __stage($2, $1, this, arguments)');
 ```
 
+MCP v1.10.0 起可以直接让 MCP 生成本地插桩文件，不用手写替换：`instrumentation(action="rewrite_source", source_path="sdk.js", output_path="sdk.tapped.js", tap_stage_calls=True, rewrite_member_access=False)`。生成的文件在 Node、vm 和 jsdom 里都能运行，事件在 `globalThis.__mcp_vmp_log`，格式和浏览器日志相同，断网或被封 IP 时也能反复跑。
+
+序列很长时按段比：`instrumentation(action="log", seq_window=[590, 610])` 取一段；在状态里发生的读取带 `stage`（最内层状态号），`instrumentation(action="log", stage=<p>)` 取某个状态里的事件；`stage_break(action="set", p=<p>)` 再 `reload`，能记下这个状态完整参数、返回值和调用栈的有界快照（页面加载时执行的状态也能记到）。
+
 ---
 
 ## 5. 常见问题与陷阱
@@ -400,7 +404,7 @@ source = source.replace(STAGE, 'return __stage($2, $1, this, arguments)');
 
 1. `url_pattern` 没命中——确认 VMP 实际 URL（`list_network_requests` 里看），glob 模式要用 `**/` 前缀才能匹配任意路径
 2. 脚本已在安装前加载——确认加载时序，需要重新采样时用 `instrumentation(action="reload")`，不先清全部缓存
-3. route 命中但原文透传——查看 `files_seen`、`files_passed_through`、`last_skip_reason` 与 `last_error`，区分体积门槛、语法/过滤范围和非成功响应
+3. route 命中但原文透传——查看 `files_seen`、`files_passed_through`、`last_skip_reason` 与 `last_error`，区分体积门槛、语法/过滤范围和非成功响应；MCP v1.10.0 起 `skipped_files` 逐个列出被放行的文件、大小、原因和建议的 `max_file_size`，`capped_files` 列出改写处数到 `max_rewrites` 上限的文件
 
 ### Q2：AST 模式报 `parse_error`
 
@@ -426,7 +430,7 @@ source = source.replace(STAGE, 'return __stage($2, $1, this, arguments)');
 
 1. VMP 尚未触发——查看业务完成信号/请求记录，不把 networkidle 当作签名已完成
 2. 改写位置被跳过、过滤或尚未执行——核对目标响应、status 与主世界 runtime 标记
-3. Frame、tag/filter 不匹配，或日志达到容量——检查所选 Frame 和 `possibly_capped`；空结果不证明没有读取
+3. Frame、tag/filter 不匹配，或日志达到容量——检查所选 Frame、`possibly_capped` 和 `dropped`；空结果不证明没有读取
 
 ### Q5：日志爆炸到上限 20000 条
 
@@ -458,4 +462,4 @@ source = source.replace(STAGE, 'return __stage($2, $1, this, arguments)');
 - [骨架案例](../cases/universal-vmp-source-instrumentation.md)：模板，需当前适用性验证
 - [真实上游本地案例](../references/real-source-cases.md)：VM/CFF/CryptoJS/FingerprintJS 的来源与证据边界
 - [准备与验证脚本说明](../scripts/real_cases/README.md)：按需执行，本地通过不等于商业站点验证
-- [MCP 上游](https://github.com/WhiteNightShadow/camoufox-reverse-mcp)（本指南对齐 v1.8.0，4.5 节对齐 v1.9.4）
+- [MCP 上游](https://github.com/WhiteNightShadow/camoufox-reverse-mcp)（本指南对齐 v1.8.0，4.5 节对齐 v1.9.4，日志切片和离线改写对齐 v1.10.0）
