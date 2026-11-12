@@ -46,8 +46,8 @@ VM/CFF 原 lock 的镜像 URL 已规范为 registry.npmjs.org，所有版本和 
 KProtect 编译器和 VM 保持原样，只解析官方占位符、枚举并打包；`unicodeDigest`、
 `numericLedger` 是自写业务输入，`countSubstrings` 在准备时从上游源树读取。
 baseline/VM/CFF/CFF-disabled 均包含该 GPL 用例；VM bundle 还含 GPL 解释器。
-**生成资产不自动继承主仓库 MIT 或本目录 CC0。** 输出保留完整对应源树、archive、构建配方、
-原许可证和 bundle 提示；需要交付输出时保留这些来源材料，不把 bundle 单独回填到 MIT 仓库。
+**生成资产不自动继承主仓库 AGPL-3.0 或本目录 CC0。** 输出保留完整对应源树、archive、构建配方、
+原许可证和 bundle 提示；需要交付输出时保留这些来源材料，不把 bundle 单独回填到主仓库。
 
 Acorn 不作为独立案例或 Skill 资源打包，结构验证用已固定的 Babel parser。
 javascript-obfuscator 自己要求的 Acorn 8.8.2 仍由其 npm 传递依赖安装，不能从上游 lock 关系中伪删。

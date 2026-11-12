@@ -286,3 +286,9 @@ python main.py
 | v3.2.0 | 2026-04-18 | 移除 MCP session 依赖，Checklist 压缩到三项，cases/ 成为唯一经验库 |
 | v3.1.0 | 2026-04-18 | SKILL.md 瘦身，references/ 拆分子文档，工具引用对齐 MCP 合并 API |
 | v3.0.0 | 2026-04-18 | 硬约束 Checklist + 红线四条 + 经验法则压缩 |
+
+## 许可证
+
+本仓库以 [GNU Affero General Public License v3.0](LICENSE)（AGPL-3.0）发布。Copyright © 2026 WhiteNightShadow。
+
+`scripts/real_cases/` 里自写的准备与验证脚本、测试输入按该目录的 [LICENSE](scripts/real_cases/LICENSE) 以 CC0-1.0 放弃权利；按配方下载的上游源码和依赖沿用各自原有的许可证。
