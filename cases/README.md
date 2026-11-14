@@ -16,6 +16,7 @@
 | `nmpa.gov.cn` / `NfBCSins2OywS` / `NfBCSins2OywT` / `.e17ed02.js` / 412 挑战 | 签名型（RS 6） | [`jsvmp-ruishu6-cookie-412-sdenv.md`](./jsvmp-ruishu6-cookie-412-sdenv.md) | sdenv 纯 Node.js |
 | `acmescripts` / `/akam/` | 签名型（Akamai） | (待建) | (待建) |
 | `acw_sc__v2` / Aliyun WAF | 签名型 | (待建) | (待建) |
+| `captchaVerifyParam` / `aliyunCaptcha` / `feilin0` / `dynamicJS/pe.` / `slideAuth` | 行为型（滑块拼图） | [`aliyun-feilin-slider-human-track.md`](./aliyun-feilin-slider-human-track.md) | 离线复现 `data`（VM 查表变换）+ 真人轨迹形态（慢逼近→谷底→甩鞭） |
 | `FSSBBIl1UgzbN7N` / `_RSG` / 200KB 混淆 JS + 412 | 签名型（RS） | 同 nmpa 案例 | sdenv |
 | `obfuscator.io` 特征（`_0x` 大量前缀） | 纯混淆线索 | (无专案，按当前问题选静态分析/四板斧步骤) | AST 反混淆与行为对照 |
 
