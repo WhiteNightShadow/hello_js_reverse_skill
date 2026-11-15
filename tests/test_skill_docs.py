@@ -19,7 +19,8 @@ PRIVATE_TERMS = ROOT / 'tests/private_terms.local.txt'
 GENERIC_KEYWORDS = {'obfuscator.io', '_0x', '412', 'while-switch', '200KB+', '200KB', 'switch', 'sign',
                     'token'}
 # Vendor names that the index mentions in prose rather than as backticked keywords.
-EXTRA_SITE_TERMS = ['tiktok', 'douyin', '抖音', '瑞数', 'akamai', 'cloudflare', '极验', 'geetest', 'bdms', 'ttwid']
+EXTRA_SITE_TERMS = ['tiktok', 'douyin', '抖音', '瑞数', 'akamai', 'cloudflare', '极验', 'geetest', 'bdms', 'ttwid',
+                    'aliyun', '阿里云', 'feilin', '飞鳞', 'alicdn', 'aliyuncs']
 # Removed tools may only be named in the migration table and the old-rule index.
 TOOL_ALLOWED = {'mcp-tool-reference.md', 'mcp-tools.json', 'experience-rules-full.md'}
 STALE_TOOLS = ['add_init_script', 'bypass_debugger_trap', 'dump_jsvmp_strings', 'get_runtime_probe_log',
