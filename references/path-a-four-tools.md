@@ -291,7 +291,7 @@ MCP 操作：
 
 `filter_property_names` 同时约束属性读取与方法调用；`filter_object_names` 支持 `this.bytecode` 等静态路径，不推断动态对象表达式或运行时别名。显式 `mode="regex"` 配非空 `filter_property_names` / `filter_object_names` 会在安装前被拒绝，并建议改用 `mode="ast"`。AST 失败时，默认 `fallback_on_error=True` 也只在未设置这些过滤器时尝试 regex；回退仍可能原样 skip。
 
-默认 `max_file_size=200000` 字节、`on_oversized="selective"`；大文件没有过滤器时原样跳过。先按当前源码收窄范围并关闭不需要的调用改写，避免因文件大而直接切 regex 或强制全量改写。
+默认 `on_oversized="selective"`，`max_file_size` 在 MCP v1.10.0 起是 2000000 字节（更早是 200000）；大文件没有过滤器时原样跳过，v1.10.0 起 `status` 和 `log` 的 `skipped_files` 会列出这些文件的大小、原因和建议值。先按当前源码收窄范围并关闭不需要的调用改写，避免因文件大而直接切 regex 或强制全量改写。
 
 #### 步骤 10：让插桩先于 VMP 生效
 

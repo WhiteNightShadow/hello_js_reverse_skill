@@ -576,6 +576,7 @@ const result = win.eval(`JSON.stringify({
 5. **补丁在 SDK 加载前完成** — 加载顺序影响结果，SDK 可能在首次读取后缓存
 6. **native code 格式要匹配基线浏览器** — Firefox 与 Chrome 不同
 7. **补丁持续不收敛就上移路线** — 考虑 [浏览器级运行时](original-sdk-runtime.md#选运行时)
+8. **值对不上又找不到差异时比状态序列** — 平坦化分发的 VM 用 [阶段对照](jsvmp-source-instrumentation.md#45-平坦化分发的阶段对照) 找第一个分叉的状态
 
 ---
 

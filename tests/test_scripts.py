@@ -72,7 +72,7 @@ class ScriptTests(unittest.TestCase):
             server.shutdown();server.server_close();thread.join(timeout=2)
 
     def test_legacy_node_test_entrypoints_stay_offline(self):
-        for name in ('node-request','vm-sandbox','wasm-loader','browser-auto'):
+        for name in ('node-request','vm-sandbox','wasm-loader','browser-auto','env-bundle'):
             result=subprocess.run(['node',str(ROOT/'templates'/name/'main.js'),'--test'],capture_output=True,text=True,timeout=10)
             self.assertEqual(result.returncode,0,result.stderr)
 
