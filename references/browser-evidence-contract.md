@@ -73,6 +73,24 @@ trace_property_access(action="stop", mode="summary", collect_values=True)
 - 高频记录可能改变时序，不能宣称完全不可检测。启用 engine trace 会临时关闭内容 sandbox；普通启动不受影响。
 - 不具备原生追踪时仍可 `compare_env()` + 分批 `evaluate_js`，只补证据支持的环境项，保持 UA 与 API 一致。
 
+## 原生断点调试：仅用于独立观察会话
+
+当静态定位或源码插桩已锁定关键行、热状态或发包出口，需要暂停线程读取闭包词法变量或请求发送瞬间的入参时，可使用协议级断点调试器（如 MCP v1.11.0 的 `rdp_debugger`）：
+
+| 观测手段 | 是否改写页面源码 | 是否暂停 JS 线程 | 擅长取什么证据 | 核心边界 |
+|---|---|---|---|---|
+| 源码插桩（`instrumentation`） | 是（HTTP 层改写） | 否 | 连续状态序列、`hot_keys`、多拍属性读取 | 大文件上限、语法跳过、源码长度/完整性校验 |
+| 原生属性追踪（`trace_property_access`） | 否（Gecko C++ 层） | 否 | 77 个固定引擎入口是否被读取 | 不能任意停行，不记录闭包局部变量 |
+| 原生断点调试（如 `rdp_debugger`） | 否（Firefox RDP） | 是 | 暂停帧调用栈、闭包词法作用域、`xhr_breakpoint` 发包前明文入参 | 独立浏览器进程、暂停拉大真实时钟差 |
+
+使用 `rdp_debugger` 时遵守五条证据边界：
+
+- **独立进程与状态隔离**：`rdp_debugger(action="launch")` 通过 `-start-debugger-server` 启动独立于 Playwright `launch_browser` 的浏览器进程和临时目录；两边的网络捕获、已注入 Hook、内存态 Cookie/Storage 不会自动互通。
+- **时序与调试面副作用**：断点暂停期间真实时钟（`Date.now()` / `performance.now()`）继续推进，恢复执行后极易触发时间差反调试（`链路 I`），且调试口开启了 `devtools.chrome.enabled`。不要把一次被断点停过的请求遭服务端拒绝当成“算法错”；抓清局部状态后，回到无断点的干净会话或离线环境做收口验证。
+- **动态脚本断点生命周期**：按 `source_url` 下的断点可在 `reload` 时自动重挂；对无 URL 的 `eval` / `new Function` 脚本按 `source`（`sourceId`）下的断点绑定在旧 `thread` 上，刷新或导航后返回 `reapply_skipped`，需在新线程重新定位。
+- **列号基准与自动吸附**：工具入参 `column` 为 1-based（对齐 `Error.stack` 与 DevTools 面板），底层 RDP 为 0-based 并自动吸附到同行最近可停列；单行压缩脚本下断后务必核对返回值里的 `location`、`snapped_from_column_1based` 与 `breakable_positions`。
+- **配置继承降级与本地安全**：继承 `CAMOU_CONFIG` 指纹、无认证代理、`headless`、`os`、`locale`、`browser_version`；带认证代理、`headless="virtual"` 及原版 Firefox 下的降级项见返回值 `warnings`。RDP 端口无认证且具备主进程权限，macOS / Linux 优先传 `unix_socket=True`（`0700` 临时目录）；`attach` 模式关闭时不会删除外部浏览器的 socket；源码内含孤立 UTF-16 代理项时 `source` 会替换为 `U+FFFD` 并返回 `lone_surrogates_replaced`。
+
 ## 离线验签
 
 ```text

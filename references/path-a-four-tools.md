@@ -35,6 +35,8 @@
 | 第三斧 | 日志分析 | `get_trace_data` / 主世界日志 + 反向追踪 | 从已捕获 I/O 推断公式 | 未捕获的数据、preview 占位与容量限制 | 各类已采集证据均可分析 |
 | 第四斧 | 源码级插桩 | `instrumentation(action=...)` 的 install / log | 所选 VM 内部属性与调用位置 | 语法/语义 skip、体积限制、完整性检测与观测开销 | 各类均需原始/改写对照 |
 
+补充抓拍：当静态搜索或源码插桩已锁定关键行、热状态或发包出口，仅差某一拍的闭包局部变量或请求发出前入参时，可在独立观察会话中用原生断点调试（如 Firefox 原生 RDP 的 `rdp_debugger`：`set_breakpoint` / `xhr_breakpoint` → `scopes` / 帧内 `evaluate`）定点抓拍一次；因断点暂停会拉大时钟间隔且与 Playwright 会话隔离，抓清结构后回到干净会话或离线环境验证，详见 [浏览器取证契约](browser-evidence-contract.md#原生断点调试仅用于独立观察会话)。
+
 ### 按观测敏感度的适用性
 
 | 类型 | 可用板斧 | 说明 |

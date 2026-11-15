@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "mcp_version": "1.10.0",
+  "mcp_version": "1.11.0",
   "tools": [
     {
       "name": "check_environment",
@@ -967,6 +967,147 @@
           "file_path"
         ],
         "title": "query_trace_fileArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "rdp_debugger",
+      "parameters": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "port": {
+            "default": 0,
+            "title": "Port",
+            "type": "integer"
+          },
+          "url": {
+            "default": "about:blank",
+            "title": "Url",
+            "type": "string"
+          },
+          "executable": {
+            "type": "string",
+            "title": "Executable"
+          },
+          "wait_page": {
+            "default": 5.0,
+            "title": "Wait Page",
+            "type": "number"
+          },
+          "url_substr": {
+            "default": "",
+            "title": "Url Substr",
+            "type": "string"
+          },
+          "target_type": {
+            "default": "frame",
+            "title": "Target Type",
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "title": "Line"
+          },
+          "column": {
+            "type": "integer",
+            "title": "Column"
+          },
+          "condition": {
+            "type": "string",
+            "title": "Condition"
+          },
+          "frame_actor": {
+            "type": "string",
+            "title": "Frame Actor"
+          },
+          "expression": {
+            "default": "",
+            "title": "Expression",
+            "type": "string"
+          },
+          "direction": {
+            "default": "over",
+            "title": "Direction",
+            "type": "string"
+          },
+          "timeout_ms": {
+            "default": 30000,
+            "title": "Timeout Ms",
+            "type": "integer"
+          },
+          "path": {
+            "default": "",
+            "title": "Path",
+            "type": "string"
+          },
+          "method": {
+            "default": "ANY",
+            "title": "Method",
+            "type": "string"
+          },
+          "on_next": {
+            "default": false,
+            "title": "On Next",
+            "type": "boolean"
+          },
+          "require_frame": {
+            "default": true,
+            "title": "Require Frame",
+            "type": "boolean"
+          },
+          "save_path": {
+            "default": "",
+            "title": "Save Path",
+            "type": "string"
+          },
+          "max_chars": {
+            "default": 4000000,
+            "title": "Max Chars",
+            "type": "integer"
+          },
+          "max_items": {
+            "default": 200,
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "default": "",
+            "title": "Source Url",
+            "type": "string"
+          },
+          "remove_all": {
+            "default": false,
+            "title": "Remove All",
+            "type": "boolean"
+          },
+          "remove": {
+            "default": false,
+            "title": "Remove",
+            "type": "boolean"
+          },
+          "unix_socket": {
+            "default": false,
+            "title": "Unix Socket",
+            "type": "boolean"
+          },
+          "socket_path": {
+            "default": "",
+            "title": "Socket Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "rdp_debuggerArguments",
         "type": "object"
       }
     },

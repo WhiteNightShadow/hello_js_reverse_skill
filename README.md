@@ -208,6 +208,7 @@ python main.py
 | `cookies(action='get'\|'set'\|'delete')` | Cookie 管理 |
 | `compare_env` | 采集 JS 环境基线；其他属性需通过 `properties` 或分批 `evaluate_js` 扩展；MCP v1.10.0 起 `output_path` 导出完整环境包 |
 | `trace_property_access(action=...)` | reverse.5 的 77 点 Gecko 原生追踪（旧兼容构建为 75 点）；支持 start→操作→stop、kind/site 过滤和覆盖边界 |
+| `rdp_debugger(action=...)` | Firefox 原生 RDP 断点调试：真断点、单步、调用栈、词法作用域、暂停帧求值与 `xhr_breakpoint` 发包前断点（独立观察会话，MCP v1.11.0） |
 | `verify_signer_offline` | 用真实样本离线验证签名代码 |
 | `export_state` / `import_state` | 保存/恢复浏览器状态 |
 | `check_environment` / `reset_browser_state` | 环境自检 / 清理残留状态 |
@@ -261,12 +262,13 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.10.0**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩与可选 Gecko 原生属性追踪）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.11.0**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩、Firefox 原生 RDP 断点调试与可选 Gecko 原生属性追踪）
 
 ## 版本记录
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.14.0 | 2026-11-15 | 配合 MCP v1.11.0：补充原生断点调试（`rdp_debugger`）证据边界并同步 42 工具快照；新增等长流式护甲与布尔判决分层锁死方法及脱敏案例 |
 | v3.13.0 | 2026-11-12 | 配合 MCP v1.10.0：插桩默认值、日志切片、离线插桩、preset 主世界；新增环境包套用模板 `templates/env-bundle/` |
 | v3.12.0 | 2026-11-10 | 平坦化分发的阶段对照（`tap_stage_calls`），MCP 工具快照更新到 v1.9.4 |
 | v3.11.1 | 2026-11-10 | JSVMP 探针日志改到页面主世界读取，配合 camoufox-reverse-mcp v1.9.3 |
@@ -286,6 +288,10 @@ python main.py
 | v3.2.0 | 2026-04-18 | 移除 MCP session 依赖，Checklist 压缩到三项，cases/ 成为唯一经验库 |
 | v3.1.0 | 2026-04-18 | SKILL.md 瘦身，references/ 拆分子文档，工具引用对齐 MCP 合并 API |
 | v3.0.0 | 2026-04-18 | 硬约束 Checklist + 红线四条 + 经验法则压缩 |
+
+## 社区贡献者
+
+- [@Moojing-jianchuan](https://github.com/Moojing-jianchuan) — 等长字节码流式变换与粗粒度布尔判决分层隔离实践案例（#8），以及配套 MCP 的阶段插桩、离线插桩与 Firefox RDP 断点调试反馈与共建
 
 ## 许可证
 
