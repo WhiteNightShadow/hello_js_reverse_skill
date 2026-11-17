@@ -18,6 +18,7 @@
 | `acw_sc__v2` / Aliyun WAF | 签名型 | (待建) | (待建) |
 | `FSSBBIl1UgzbN7N` / `_RSG` / 200KB 混淆 JS + 412 | 签名型（RS） | 同 nmpa 案例 | sdenv |
 | `obfuscator.io` 特征（`_0x` 大量前缀） | 纯混淆线索 | (无专案，按当前问题选静态分析/四板斧步骤) | AST 反混淆与行为对照 |
+| `zhipin.com` / `__zp_stoken__` / `security-js` / `zpToken` / `code 38` | 签名型（JSVMP + jsdom 原生性） | [`boss-zhipin-zp-stoken-security-js-vmp.md`](./boss-zhipin-zp-stoken-security-js-vmp.md) | 载荷公式反解（`t→dl→src` 238 字节流）+ `document` 形状 / `document.all` 活性 / iframe 子 realm toString / canvas 真值 |
 
 ### 使用方式
 
