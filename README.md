@@ -262,12 +262,13 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.11.0**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩、Firefox 原生 RDP 断点调试与可选 Gecko 原生属性追踪）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.11.1**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩、Firefox 原生 RDP 断点调试与可选 Gecko 原生属性追踪）
 
 ## 版本记录
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.15.0 | 2026-11-18 | 新增 jsdom 子 Realm 原型链与 `toString`、自有/原型描述符对齐、`Document.prototype.all` 活性集合补丁；补充在线改写路由残留核查、定长码点流逐槽反解消融与脱敏案例，同步 MCP v1.11.1 快照 |
 | v3.14.0 | 2026-11-15 | 配合 MCP v1.11.0：补充原生断点调试（`rdp_debugger`）证据边界并同步 42 工具快照；新增等长流式护甲与布尔判决分层锁死方法及脱敏案例 |
 | v3.13.0 | 2026-11-12 | 配合 MCP v1.10.0：插桩默认值、日志切片、离线插桩、preset 主世界；新增环境包套用模板 `templates/env-bundle/` |
 | v3.12.0 | 2026-11-10 | 平坦化分发的阶段对照（`tap_stage_calls`），MCP 工具快照更新到 v1.9.4 |
@@ -291,7 +292,7 @@ python main.py
 
 ## 社区贡献者
 
-- [@Moojing-jianchuan](https://github.com/Moojing-jianchuan) — 等长字节码流式变换与粗粒度布尔判决分层隔离实践案例（#8），以及配套 MCP 的阶段插桩、离线插桩与 Firefox RDP 断点调试反馈与共建
+- [@Moojing-jianchuan](https://github.com/Moojing-jianchuan) — 等长字节码流式变换与粗粒度布尔判决分层隔离实践案例（#8），位打包双分发器定长槽位消融与 jsdom 原生性/子 Realm 校准实践案例（#9），以及配套 MCP 的阶段插桩、离线插桩与 Firefox RDP 断点调试反馈与共建
 
 ## 许可证
 

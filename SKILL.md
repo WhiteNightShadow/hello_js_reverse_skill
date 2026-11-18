@@ -7,8 +7,8 @@ description: >
   配套 Camoufox MCP 取证，交付可验证的采集程序，支持分页、断点续采和改版回归。
   仅用于自有或已授权接口；微信小程序 wxapkg 解包使用对应小程序技能。
 metadata:
-  version: "3.14.0"
-  mcp-compatible: "1.8.0（旧工作流兼容 1.6.x / 1.7.x；新参数需对应工具 schema；hook_jsvmp_interpreter 需 1.9.3；tap_stage_calls 需 1.9.4；rewrite_source、日志切片、环境包导出需 1.10.0；rdp_debugger 原生断点需 1.11.0）"
+  version: "3.15.0"
+  mcp-compatible: "1.8.0（旧工作流兼容 1.6.x / 1.7.x；新参数需对应工具 schema；hook_jsvmp_interpreter 需 1.9.3；tap_stage_calls 需 1.9.4；rewrite_source、日志切片、环境包导出需 1.10.0；rdp_debugger 原生断点需 1.11.0+）"
 ---
 
 # 通用采集与签名分析
@@ -148,8 +148,8 @@ metadata:
 
 ## 更新记录
 
+- v3.15.0（2026-11-18）：新增 jsdom 子 Realm 原型链与 `toString` 修补、实例/原型属性描述符对齐、`Document.prototype.all` 引擎级 undetectable 活性集合补丁，以及在线改写路由残留核查、定长码点流逐槽反解与同侧 A/A 自抖动槽过滤方法及脱敏案例；工具快照同步至 MCP v1.11.1。
 - v3.14.0（2026-11-15）：配合 MCP v1.11.0 补充原生断点调试（如 `rdp_debugger`）的独立观察会话与时序证据边界，同步 42 个工具快照；补充等长流式护甲、固定密文前缀与粗粒度布尔判决分层锁死的方法判断及脱敏案例。
 - v3.13.0（2026-11-12）：配合 MCP v1.10.0：插桩默认只记读取、大文件阈值和跳过原因、按 `seq`/`stage` 切片、`rewrite_source` 离线插桩、preset 改装主世界；新增 `templates/env-bundle/`，把 `compare_env` 导出的环境包套到 jsdom；MCP 工具快照更新到 v1.10.0。
 - v3.12.0（2026-11-10）：新增平坦化分发的阶段对照，用 MCP v1.9.4 的 `tap_stage_calls` 记录浏览器和本地补环境的状态序列，找第一个分叉的状态；MCP 工具快照更新到 v1.9.4。
-- v3.11.1（2026-11-10）：JSVMP 探针日志改用 `evaluate_js(..., world="main")` 读取，配合 MCP v1.9.3 把探针装在页面主世界。
 - 历史版本与详细差异见 Git tags / Releases。模板目录和引用路径保持不变，避免已有引用失效。
