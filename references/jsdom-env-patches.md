@@ -67,6 +67,7 @@ const jsdomPatterns = [
   /^\s*\w+\s*\([^)]*\)\s*\{[\s\S]*?const\s+esValue\s*=/,       // jsdom 接口方法模式
   /^\s*function\s*\([^)]*\)\s*\{[\s\S]*?this\._globalObject/,   // jsdom 全局对象访问模式
   /^\s*\w+\s*\([^)]*\)\s*\{\s*const\s+\w+\s*=\s*this\s*!==/,   // jsdom this 检查模式
+  /throw new TypeError\("Illegal constructor"\)/,              // jsdom WebIDL 构造器模式
 ];
 
 // 覆写全局 Function.prototype.toString
@@ -134,6 +135,187 @@ for (const proto of protoTargets) {
 }
 scanPrototypeChain(doc, 5);
 scanPrototypeChain(nav, 5);
+```
+
+### 1.1 同源 iframe 子 Realm 的独立 toString 与原型链修补（按需启用）
+
+**问题**：jsdom 中新建 `iframe` 时存在两层跨 Realm 陷阱：① 子窗口拥有独立的 `childWin.Function.prototype`，仅覆写顶层 `win.Function.prototype.toString` 管不到子 Realm；② `childWin.constructor`（`Window`）、`childWin.EventTarget` 及子窗口 WebIDL DOM 方法实际创建在 Node 外层 Realm（原型链指向外层 `Function.prototype` 而非 `childWin.Function.prototype`）。若不把 `childWin.EventTarget` 归位到 `childWin.Function.prototype` 并对子窗口原型链执行 `markNative`，读取 `String(iframe.contentWindow.constructor)` 或 `String(iframe.contentDocument.createElement)` 仍会直接暴露 jsdom 源码。注意 `formatNative` 输出格式须与基线浏览器内核一致（Chromium 单行 vs Firefox/Camoufox 多行）。
+
+```javascript
+// helpers: { markNative, nativeFnSet, jsdomPatterns, scanPrototypeChain, formatNative }
+function patchIframeChildRealms(win, helpers, patchedRealms = new WeakSet()) {
+  const {
+    markNative, nativeFnSet, jsdomPatterns, scanPrototypeChain,
+    formatNative = (name) => `function ${name || ''}() { [native code] }`,
+  } = helpers;
+  const proto = win.HTMLIFrameElement && win.HTMLIFrameElement.prototype;
+  if (!proto) return;
+
+  function patchChildWindow(childWin) {
+    if (!childWin || patchedRealms.has(childWin)) return;
+    patchedRealms.add(childWin);
+    try {
+      const ChildFn = childWin.Function;
+      if (!ChildFn) return;
+      // 将子窗口 EventTarget 归位到子 Realm 的 Function.prototype
+      if (childWin.EventTarget && Object.getPrototypeOf(childWin.EventTarget) !== ChildFn.prototype) {
+        Object.setPrototypeOf(childWin.EventTarget, ChildFn.prototype);
+      }
+      markNative(childWin.constructor);
+      if (childWin.Document) markNative(childWin.Document);
+      if (typeof scanPrototypeChain === 'function') {
+        if (childWin.document) scanPrototypeChain(childWin.document, 5);
+        if (childWin.navigator) scanPrototypeChain(childWin.navigator, 4);
+        scanPrototypeChain(childWin, 3);
+      }
+      if (ChildFn.prototype !== win.Function.prototype) {
+        const origToString = ChildFn.prototype.toString;
+        const wrapped = function toString() {
+          // 先走原生校验：非函数 this 继续抛出子 Realm 的 childWin.TypeError
+          const src = origToString.call(this);
+          if (nativeFnSet.has(this) || this === childWin.constructor) {
+            return formatNative(this.name || '');
+          }
+          for (const pat of jsdomPatterns) {
+            if (pat.test(src)) return formatNative(this.name || '');
+          }
+          return src;
+        };
+        Object.setPrototypeOf(wrapped, ChildFn.prototype);
+        markNative(wrapped);
+        Object.defineProperty(ChildFn.prototype, 'toString', {
+          value: wrapped, writable: true, configurable: true,
+        });
+      }
+      // 递归覆盖子窗口内部再创建的嵌套 iframe
+      patchIframeChildRealms(childWin, helpers, patchedRealms);
+    } catch (e) {}
+  }
+
+  // 同时拦截 contentWindow 与 contentDocument（防止经 contentDocument.defaultView 绕过）
+  for (const prop of ['contentWindow', 'contentDocument']) {
+    const desc = Object.getOwnPropertyDescriptor(proto, prop);
+    if (!desc || typeof desc.get !== 'function') continue;
+    const getter = markNative(function () {
+      const val = desc.get.call(this);
+      const targetWin = prop === 'contentWindow' ? val : (val && val.defaultView);
+      if (targetWin) patchChildWindow(targetWin);
+      return val;
+    });
+    Object.defineProperty(proto, prop, {
+      get: getter, enumerable: desc.enumerable, configurable: true,
+    });
+  }
+}
+```
+
+### 1.2 实例自有属性与原型链描述符形状对齐（按需启用）
+
+**问题**：部分 SDK 会同时采集 `Object.getOwnPropertyNames(document).length` 与 `Object.keys(document).length`。原生 jsdom 空文档的 `document` 自有属性通常只有 `['location']`（`readyState`、`visibilityState`、`hidden` 本就在 `Document.prototype` 上）；实战中出现多余自有属性，最常见原因是**补环境脚本自己用 `Object.defineProperty(doc, ...)` 把原型属性挂到了实例上或漏设 `enumerable`**，其次是 `[LegacyUnforgeable]` 属性（如 `location`）在不同内核下的可枚举差异。首选从源头把 WebIDL 原型属性定义在 `Object.getPrototypeOf(doc)` 上；若需根据真实页面通过 `evaluate_js(..., world="main")` 采集的描述符快照事后收敛（注：`compare_env` 不导出 `document` 自有/原型描述符表），迁移时须保留已打补丁的 getter/value 并记录不可配置项：
+
+```javascript
+// realShape: { own: { [key]: { enumerable } }, protoOwned: ['readyState', 'fonts', ...], protoEnumerable?: { [key]: boolean } }
+function alignOwnAndProtoShape(instance, realShape) {
+  const proto = Object.getPrototypeOf(instance);
+  const skippedUnconfigurable = [];
+  for (const key of (realShape.protoOwned || [])) {
+    const desc = Object.getOwnPropertyDescriptor(instance, key);
+    if (!desc) continue;
+    if (!desc.configurable) {
+      skippedUnconfigurable.push(key);
+      continue;
+    }
+    const protoDesc = proto ? Object.getOwnPropertyDescriptor(proto, key) : undefined;
+    if (proto && (!protoDesc || protoDesc.configurable)) {
+      const targetEnum = realShape.protoEnumerable && key in realShape.protoEnumerable
+        ? realShape.protoEnumerable[key]
+        : (protoDesc ? protoDesc.enumerable : true);
+      Object.defineProperty(proto, key, { ...desc, enumerable: targetEnum });
+    }
+    delete instance[key];
+  }
+  for (const [key, meta] of Object.entries(realShape.own || {})) {
+    const desc = Object.getOwnPropertyDescriptor(instance, key);
+    if (!desc || typeof meta.enumerable !== 'boolean' || desc.enumerable === meta.enumerable) continue;
+    if (!desc.configurable) {
+      skippedUnconfigurable.push(key);
+      continue;
+    }
+    Object.defineProperty(instance, key, { ...desc, enumerable: meta.enumerable });
+  }
+  return { skippedUnconfigurable };
+}
+```
+
+### 1.3 `document.all` 引擎级 undetectable 与不可删活索引（按需启用）
+
+**问题**：真实浏览器中 `Document.prototype.all` 满足 `typeof document.all === 'undefined'` 且 `document.all == null`，但按集合访问 `length`、`document.all[i]`、`[...document.all]` 又能实时反映 DOM 节点，且有效下标执行 `delete document.all[i]` 返回 `false` 并保留原节点（普通对象或顶层 `Proxy` 无法同时满足 `typeof === 'undefined'` 与活性集合语义）。在确认目标实际探测 `document.all` 时，受控本地 Node 进程可配合 `node --allow-natives-syntax` 的 `%GetUndetectable()` + 原型 `Proxy` 实现，并将 `all` 挂在 `Document.prototype` 上以避免污染 `document` 自有属性：
+
+```javascript
+// 注意：1) 进程须带 --allow-natives-syntax；2) lockIndices=true 会对当前 0..len-1 锁 configurable:false，若页面后续删除节点缩减 DOM 可传 lockIndices:false
+function patchDocumentAll(win, vmModule, markNative, options = {}) {
+  let und;
+  try {
+    und = vmModule.runInThisContext('%GetUndetectable()');
+  } catch (err) {
+    throw new Error('patchDocumentAll 需要以 node --allow-natives-syntax 启动进程', { cause: err });
+  }
+  const getNodes = () => Array.prototype.slice.call(win.document.getElementsByTagName('*'));
+  let lockedCount = 0;
+  function syncNonConfigurableIndices(len) {
+    if (options.lockIndices === false) return;
+    const cap = Math.min(len, 8192);
+    for (let i = lockedCount; i < cap; i++) {
+      Object.defineProperty(und, i, {
+        get: () => getNodes()[i],
+        enumerable: true,
+        configurable: false,
+      });
+    }
+    lockedCount = Math.max(lockedCount, cap);
+  }
+  const collectionProto = new Proxy(Object.create(null), {
+    get(_t, prop) {
+      const nodes = getNodes();
+      if (prop === 'length') {
+        syncNonConfigurableIndices(nodes.length);
+        return nodes.length;
+      }
+      if (prop === Symbol.toStringTag) return 'HTMLAllCollection';
+      if (prop === Symbol.iterator) return function* () { yield* getNodes(); };
+      if (prop === 'item') return markNative(function item(i) { return getNodes()[i >>> 0] || null; });
+      if (prop === 'namedItem') {
+        return markNative(function namedItem(name) {
+          return getNodes().find((el) => el.id === name || el.getAttribute('name') === name) || null;
+        });
+      }
+      if (typeof prop === 'string') {
+        const idx = Number(prop);
+        if (Number.isInteger(idx) && idx >= 0 && String(idx) === prop) return nodes[idx];
+      }
+      return undefined;
+    },
+    has(_t, prop) {
+      if (typeof prop === 'string') {
+        const idx = Number(prop);
+        if (Number.isInteger(idx) && idx >= 0 && String(idx) === prop) return idx < getNodes().length;
+      }
+      return prop === 'length' || prop === 'item' || prop === 'namedItem'
+        || prop === Symbol.iterator || prop === Symbol.toStringTag;
+    },
+  });
+  Object.setPrototypeOf(und, collectionProto);
+
+  const docProto = (win.Document && win.Document.prototype) || Object.getPrototypeOf(win.document);
+  Object.defineProperty(docProto, 'all', {
+    get: markNative(function all() {
+      syncNonConfigurableIndices(getNodes().length);
+      return und;
+    }),
+    enumerable: true,
+    configurable: true,
+  });
+}
 ```
 
 ### 2. navigator.webdriver
@@ -470,6 +652,8 @@ function patchNavigatorBasics(nav, options) {
 ```
 
 ### 11. document 属性补丁
+
+> 注：若目标统计 `Object.getOwnPropertyNames(document)`（见 [1.2 形状对齐](#12-实例自有属性与原型链描述符形状对齐按需启用)），应将下方属性与 `hasFocus`/`fonts` 等定义在 `Object.getPrototypeOf(doc)`（`Document.prototype`）上而非 `doc` 实例上。
 
 ```javascript
 function patchDocument(doc) {
@@ -856,6 +1040,11 @@ function patchEnvironment(win, doc, nav, options = {}) {
 
   // ⑦ 最后一次全局扫描，标记新增的所有函数
   scanAllPrototypes(win, doc, nav);
+
+  // ⑧ 按读值证据可选启用专项补丁（默认不全开）：
+  // - 若目标创建 iframe 检测子窗口构造器/DOM 方法源码：在 ② 之后调 patchIframeChildRealms(win, helpers)
+  // - 若目标检测 document/navigator 自有属性数量：补丁直接挂原型，或在 ⑤ 之后调 alignOwnAndProtoShape(...)
+  // - 若目标实读 document.all 活性：以 node --allow-natives-syntax 启动并调 patchDocumentAll(...)
 }
 ```
 

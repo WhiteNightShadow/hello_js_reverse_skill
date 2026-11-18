@@ -95,6 +95,15 @@ SDK 常在首次读取后缓存。外部在初始化之后再刷新状态，可�
 - 观察器本身会改变函数表面，计数相近不能证明无干扰。扩大观察后变慢或超时，不能推断目标有反 Hook 检测。
 - 读取次数的绝对值不能跨环境相减来推断“新增了多少检查”，除非两边环境相同只换了 SDK。
 
+## 沙箱原生性、子 Realm 与探针开销边界
+
+当选定 jsdom / Node vm 运行原始 SDK，且常规 `navigator`、窗口几何对齐后产物仍被拒时，重点排查以下跨体系常见的引擎自证与测量干扰（代码模板见 [jsdom 环境补丁](jsdom-env-patches.md)）：
+
+1. **实例自有属性与原型链归属形状**：SDK 常读取 `Object.getOwnPropertyNames(document).length`、`Object.keys(document).length` 或枚举全局构造器（`window[name] !== undefined`）。常见根因是手写补丁误将 `Document.prototype` 属性定义到了 `doc` 实例上，或盲目批量注入空壳构造器（既可能与基线 UA 内核矛盾，又会诱导 SDK 进入原本跳过的深层实例校验分支）。应通过 `evaluate_js(..., world="main")` 采集真实页面的自有/原型描述符快照（注：`compare_env(output_path=...)` 仅覆盖 `navigator`/`screen` 原型 getter、`window.globals` 与 `CSSStyleDeclaration` 原型名，不含 `document` 描述符表），把原型属性挂回对应原型并保持真实缺失项为 `undefined`。
+2. **同源 `iframe` 子 Realm 的独立内建对象与原型链**：每个 `iframe.contentWindow` 都有独立的 `Function.prototype`，且 jsdom 中 `childWin.constructor`（`Window`）与子窗口 WebIDL 方法默认挂在 Node 外层 `Function.prototype` 上。仅覆写顶层 `window.Function.prototype.toString` 拦不住 `String(iframe.contentWindow.constructor)` 或经 `contentDocument.defaultView` 访问的子窗口，需在 `HTMLIFrameElement.prototype` 的 `contentWindow` / `contentDocument` 访问入口将 `childWin.EventTarget` 归位到子 Realm 并递归标记原型链。
+3. **特殊宿主对象语义（如 `document.all`）**：普通对象和顶层 `Proxy` 无法同时满足 `typeof document.all === 'undefined'` 与活性集合访问；探针还常执行 `delete document.all[i]` 后复读以校验有效索引不可删除。在确认 SDK 实读该对象时，可在受控本地 Node 进程配合 `--allow-natives-syntax` 的 `%GetUndetectable()` 与 `Document.prototype.all` 实现（避免挂在 `document` 实例上增加自有属性），并记录该启动参数依赖。
+4. **忙等时钟、高频探针自伤与渲染摘要**：若 SDK 含依赖 `Date.now()` / `performance.now()` 推进的校验循环，将时间冻成常数会导致执行步数激增或落入异常分支，应改用「固定初值 + 单步微小递增」；同理，在 JSVMP 热寄存器或高频分发循环上每拍都调用外部 JS 回调会因时钟推进、对象分配或 `RegExp` 静态属性变化直接令产物变形，应改用内联整数计数器 + 步数窗口门控。Canvas / WebGL 像素输出受系统字体与图形栈影响，不做纯算式拟合，直接从同一基线浏览器采集真值固化。
+
 ## 隔离与预检
 
 - 出值阶段隔离网络：拒绝意外的远程请求，确认只有本地资源命中，否则 SDK 上报可能污染服务端状态。

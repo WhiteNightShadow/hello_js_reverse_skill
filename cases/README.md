@@ -46,6 +46,7 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | [jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox.md](jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox.md) | **[v2.7.0 新]** JSVMP 双签名（X-Bogus + X-Gnarly）+ XHR/fetch 双通道拦截 + cacheOpts 初始化 + jsdom Firefox 环境伪装 | ★★★★★ | jsdom 喂入-截出策略 + Firefox 格式 native code 伪装 + cacheOpts 路径注册 + got-scraping TLS 指纹模拟 | 行为型 |
 | [multi-surface-sdk-source-isolation.md](multi-surface-sdk-source-isolation.md) | **[v3.10 新，已脱敏]** 同平台多端 SDK、软拒绝、来源隔离、原始 SDK 运行、结论纠偏 | ★★★★★ | 按端分别定路线：R0、R4 最小状态、R4 完整回放 | 不分类 |
 | [vm-stream-armour-and-boolean-oracle-isolation.md](vm-stream-armour-and-boolean-oracle-isolation.md) | **[v3.14 新，已脱敏]** 等长字节码流式护甲、压缩头产生固定密文前缀、粗粒度布尔判决下的分层变量隔离 | ★★★★ | R1：先离线往返锁死编码层，再校准单位换算并对照当前目标实测基线分布 | 不分类 |
+| [bitpacked-dual-vmp-slot-diff-and-realm-nativeness.md](bitpacked-dual-vmp-slot-diff-and-realm-nativeness.md) | **[v3.15 新，已脱敏]** 位打包双分发器 JSVMP、定长码点流逐槽反解消融、jsdom 原型链 / `document.all` / `iframe` 子 Realm 原生性校准 | ★★★★★ | R3：隔离在线改写与同页连调污染，反解槽位流过滤自抖动项后按浏览器快照单点消融 | 不分类 |
 
 [historical-experience-rules.md](historical-experience-rules.md) 是 v3.10 之前的 30 条经验法则原文，含大量单站结论，只作历史追溯，每条的现状见 [旧规则去向](../references/experience-rules-full.md)。
 
@@ -61,6 +62,7 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | `sdenv` / `FuckCookie` / 412 挑战 | jsvmp-ruishu6-cookie-412-sdenv | 高（RS） |
 | `while-switch` 分发循环 + 200KB+ 文件 | universal-vmp-source-instrumentation | 中（通用骨架） |
 | 等长无填充密文（固定前缀但搜不到魔数）+ HTTP 200 布尔判决 | vm-stream-armour-and-boolean-oracle-isolation | 中（分层锁死与往返验证方法） |
+| 位打包状态分发（移位掩码嵌套 `switch`）+ 浮动长度 Base64 令牌 + jsdom 原生性自证 | bitpacked-dual-vmp-slot-diff-and-realm-nativeness | 中（定长槽位反解消融与子 Realm / `document.all` 原生性校准） |
 
 ## 变体关系图
 

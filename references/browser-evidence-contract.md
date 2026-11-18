@@ -43,6 +43,19 @@ MCP v1.7.0 能力（调用前通过当前工具 schema 确认）：
 
 源码日志由 `instrumentation(action="log")` 从主世界读取，iframe SDK需指定相同Frame；现代语法需要本地Node/随包Acorn，保守降级可能原样跳过。源码 `files_rewritten>0` 只说明完成改写，继续检查 runtime 标记、实际日志与当前响应，不能当作脚本已经执行。反混淆/常量折叠先生成独立候选并按 [改写验证](transform-validation.md) 比较行为，不能把可读视图当等价代码。
 
+### 在线改写路由跨导航残留：对照前先核状态与字节哈希
+
+`instrumentation(action="install")` 注册的是会话级持续拦截路由，装上后不随 `navigate`、页签刷新或对话轮次自动消失，直到显式执行 `instrumentation(action="stop")`、`reset_browser_state(clear_active_routes=True)` 或关闭浏览器。注意 `check_environment()` 返回的 `browser.has_residuals` 不检查活动插桩路由，不能单靠它判定无改写残留。
+
+常见误判后果：
+- 在改写路由仍激活时页面内 `fetch` 或调用 `scripts(action="get" | "save")`（底层同样经页面上下文 `fetch` 拉取），保存下来的是插桩改写产物，字节数与 `sha256` 均与厂商原版不同，容易被误判成“服务端下发了新版本 SDK”；
+- 改写注入的辅助代码可能改变执行路径或全局状态，使同一环境与种子下的载荷出现大量字段偏移，不能用作载荷级比对基线。
+
+操作边界：
+1. 任何版本核对或字段/槽位级基线对照开始前，显式调用 `instrumentation(action="status")`，若 `active_patterns` 非空先 `stop` 并刷新干净页面；
+2. 归档脚本后立即记录原始字节的 `bytes` 与 `sha256`，后续校准认准该哈希，不同名同哈希或同名异哈希均以字节哈希为准；
+3. 将**行为观察会话**（允许开插桩、Hook、断点或调试全局变量）与**载荷基线会话**（无改写路由、未安装 `persistent=True` 主世界初始化 Hook、不向主世界注入 `__trace` 等额外全局键以避免改变 `Object.keys(window)`；若此前已装过持久主世界 Hook 则新建或重启浏览器会话）明确分开，并在结论中注明样本采集自哪类会话。
+
 ## 主世界、Frame 与 Hook 生命周期
 
 
