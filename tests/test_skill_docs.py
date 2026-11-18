@@ -20,7 +20,9 @@ GENERIC_KEYWORDS = {'obfuscator.io', '_0x', '412', 'while-switch', '200KB+', '20
                     'token'}
 # Vendor names that the index mentions in prose rather than as backticked keywords.
 EXTRA_SITE_TERMS = ['tiktok', 'douyin', '抖音', '瑞数', 'akamai', 'cloudflare', '极验', 'geetest', 'bdms', 'ttwid',
-                    'aliyun', '阿里云', 'feilin', '飞鳞', 'alicdn', 'aliyuncs']
+                    'aliyun', '阿里云', 'feilin', '飞鳞', 'alicdn', 'aliyuncs',
+                    'zhipin', 'boss直聘', '直聘', 'zp_stoken', 'zptoken', 'zppassport', 'zpgeek', 'zpdata',
+                    'security-js', '_security_check']
 # Removed tools may only be named in the migration table and the old-rule index.
 TOOL_ALLOWED = {'mcp-tool-reference.md', 'mcp-tools.json', 'experience-rules-full.md'}
 STALE_TOOLS = ['add_init_script', 'bypass_debugger_trap', 'dump_jsvmp_strings', 'get_runtime_probe_log',
@@ -79,6 +81,13 @@ class GenericMethodTests(unittest.TestCase):
         files = [path for path in CORE if path not in allowed]
         self.assert_absent(sorted(case_keywords()) + EXTRA_SITE_TERMS, files,
                            'Site-specific names belong in cases/, not in the method layer:')
+
+    def test_desensitized_cases_do_not_leak_site_terms(self):
+        desensitized = [path for path in sorted((ROOT / 'cases').glob('*.md'))
+                        if '平台类型：通用（已脱敏）' in read(path)]
+        self.assertGreaterEqual(len(desensitized), 2)
+        self.assert_absent(sorted(case_keywords()) + EXTRA_SITE_TERMS, desensitized,
+                           'Desensitized cases must stay free of site/vendor terms:')
 
     def test_private_terms_never_reach_published_files(self):
         if not PRIVATE_TERMS.exists():
