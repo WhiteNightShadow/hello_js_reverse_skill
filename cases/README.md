@@ -18,6 +18,7 @@
 | `acw_sc__v2` / Aliyun WAF | 签名型 | (待建) | (待建) |
 | `FSSBBIl1UgzbN7N` / `_RSG` / 200KB 混淆 JS + 412 | 签名型（RS） | 同 nmpa 案例 | sdenv |
 | `obfuscator.io` 特征（`_0x` 大量前缀） | 纯混淆线索 | (无专案，按当前问题选静态分析/四板斧步骤) | AST 反混淆与行为对照 |
+| `tdc.js` / `TDC_NAME` / `cap_union_prehandle` / `cap_union_new_verify` / `collect` / `errorCode 12` / `EO-Bot-Captcha-Token` | 签名型（JSVMP + XTEA + 综合分校验） | [`tencent-edgeone-teocaptcha-jsvmp-xtea.md`](./tencent-edgeone-teocaptcha-jsvmp-xtea.md) | 本地 vm 跑 SDK 出 collect + `tdc_key3` 提 build 绑定的 XTEA key + **金标准改槽二分**定位到 4 个被校验槽（`flag;sid` / 自动化分 / iframe 判定 / 计数），综合分必须同时正确 |
 
 ### 使用方式
 
@@ -47,6 +48,7 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | [multi-surface-sdk-source-isolation.md](multi-surface-sdk-source-isolation.md) | **[v3.10 新，已脱敏]** 同平台多端 SDK、软拒绝、来源隔离、原始 SDK 运行、结论纠偏 | ★★★★★ | 按端分别定路线：R0、R4 最小状态、R4 完整回放 | 不分类 |
 | [vm-stream-armour-and-boolean-oracle-isolation.md](vm-stream-armour-and-boolean-oracle-isolation.md) | **[v3.14 新，已脱敏]** 等长字节码流式护甲、压缩头产生固定密文前缀、粗粒度布尔判决下的分层变量隔离 | ★★★★ | R1：先离线往返锁死编码层，再校准单位换算并对照当前目标实测基线分布 | 不分类 |
 | [bitpacked-dual-vmp-slot-diff-and-realm-nativeness.md](bitpacked-dual-vmp-slot-diff-and-realm-nativeness.md) | **[v3.15 新，已脱敏]** 位打包双分发器 JSVMP、定长码点流逐槽反解消融、jsdom 原型链 / `document.all` / `iframe` 子 Realm 原生性校准 | ★★★★★ | R3：隔离在线改写与同页连调污染，反解槽位流过滤自抖动项后按浏览器快照单点消融 | 不分类 |
+| [tencent-edgeone-teocaptcha-jsvmp-xtea.md](tencent-edgeone-teocaptcha-jsvmp-xtea.md) | **JSVMP + 每会话换 key 的 XTEA + 服务端综合分校验**：`tdc.js` 每次字节全新、opcode 编号 build 绑定、明文含 `Error.stack` 指纹；真机只校验 4 个槽的综合分 | ★★★★ | 本地 vm 跑 SDK 出 collect → `tdc_key3` 运行期自证提 key → 解密后定点修正 4 槽 → 重加密。**全程无浏览器** | 签名型 |
 
 [historical-experience-rules.md](historical-experience-rules.md) 是 v3.10 之前的 30 条经验法则原文，含大量单站结论，只作历史追溯，每条的现状见 [旧规则去向](../references/experience-rules-full.md)。
 
