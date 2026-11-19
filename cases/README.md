@@ -18,7 +18,7 @@
 | `acw_sc__v2` / Aliyun WAF | 签名型 | (待建) | (待建) |
 | `FSSBBIl1UgzbN7N` / `_RSG` / 200KB 混淆 JS + 412 | 签名型（RS） | 同 nmpa 案例 | sdenv |
 | `obfuscator.io` 特征（`_0x` 大量前缀） | 纯混淆线索 | (无专案，按当前问题选静态分析/四板斧步骤) | AST 反混淆与行为对照 |
-| `tdc.js` / `TDC_NAME` / `cap_union_prehandle` / `cap_union_new_verify` / `collect` / `errorCode 12` / `EO-Bot-Captcha-Token` | 签名型（JSVMP + XTEA + 综合分校验） | [`tencent-edgeone-teocaptcha-jsvmp-xtea.md`](./tencent-edgeone-teocaptcha-jsvmp-xtea.md) | 本地 vm 跑 SDK 出 collect + `tdc_key3` 提 build 绑定的 XTEA key + **金标准改槽二分**定位到 4 个被校验槽（`flag;sid` / 自动化分 / iframe 判定 / 计数），综合分必须同时正确 |
+| `tdc.js` / `TDC_NAME` / `cap_union_prehandle` / `cap_union_new_verify` / `EO-Bot-Captcha-Token` | 签名型（JSVMP + XTEA + 综合分校验） | [`tencent-edgeone-teocaptcha-jsvmp-xtea.md`](./tencent-edgeone-teocaptcha-jsvmp-xtea.md) | 本地 vm 跑 SDK 出 collect + `tdc_key3` 提 build 绑定的 XTEA key + **金标准改槽二分**定位到 4 个被校验槽（`flag;sid` / 自动化分 / iframe 判定 / 计数），综合分必须同时正确 |
 
 ### 使用方式
 
