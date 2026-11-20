@@ -103,6 +103,7 @@ SDK 常在首次读取后缓存。外部在初始化之后再刷新状态，可�
 2. **同源 `iframe` 子 Realm 的独立内建对象与原型链**：每个 `iframe.contentWindow` 都有独立的 `Function.prototype`，且 jsdom 中 `childWin.constructor`（`Window`）与子窗口 WebIDL 方法默认挂在 Node 外层 `Function.prototype` 上。仅覆写顶层 `window.Function.prototype.toString` 拦不住 `String(iframe.contentWindow.constructor)` 或经 `contentDocument.defaultView` 访问的子窗口，需在 `HTMLIFrameElement.prototype` 的 `contentWindow` / `contentDocument` 访问入口将 `childWin.EventTarget` 归位到子 Realm 并递归标记原型链。
 3. **特殊宿主对象语义（如 `document.all`）**：普通对象和顶层 `Proxy` 无法同时满足 `typeof document.all === 'undefined'` 与活性集合访问；探针还常执行 `delete document.all[i]` 后复读以校验有效索引不可删除。在确认 SDK 实读该对象时，可在受控本地 Node 进程配合 `--allow-natives-syntax` 的 `%GetUndetectable()` 与 `Document.prototype.all` 实现（避免挂在 `document` 实例上增加自有属性），并记录该启动参数依赖。
 4. **忙等时钟、高频探针自伤与渲染摘要**：若 SDK 含依赖 `Date.now()` / `performance.now()` 推进的校验循环，将时间冻成常数会导致执行步数激增或落入异常分支，应改用「固定初值 + 单步微小递增」；同理，在 JSVMP 热寄存器或高频分发循环上每拍都调用外部 JS 回调会因时钟推进、对象分配或 `RegExp` 静态属性变化直接令产物变形，应改用内联整数计数器 + 步数窗口门控。Canvas / WebGL 像素输出受系统字体与图形栈影响，不做纯算式拟合，直接从同一基线浏览器采集真值固化。
+5. **跨内核 `Error.stack` 文本格式与抗指纹基线等价性**：在 Node `vm` / `jsdom`（V8）中配合 Firefox / Safari UA 运行 SDK 时，V8 默认的 `"Error\n    at ..."` 栈格式会让按 `fn@url:line:col` 编写的内部正则返回 `null` 并抛 `TypeError`，常被 SDK 外层 `try/catch` 静默捕获转写为异常遥测槽位——加载脚本时需通过 `vm.Script(..., { filename: scriptUrl })` 绑定真实脚本 URL，并用非枚举 `Error.prepareStackTrace` 对齐目标引擎栈文本。同时，若基线浏览器开启隐私或抗指纹保护（例如画布读回本身即为全零像素或固定受控摘要），本地轻量存根若已与基线实测输出一致，切勿盲目替换为第三方原生渲染库反而制造新差异。
 
 ## 隔离与预检
 

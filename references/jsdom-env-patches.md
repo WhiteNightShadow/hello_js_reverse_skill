@@ -318,6 +318,56 @@ function patchDocumentAll(win, vmModule, markNative, options = {}) {
 }
 ```
 
+### 1.4 `Error.stack` 跨引擎格式对齐与非枚举隐藏（按需启用）
+
+**问题**：在 Node.js（V8）的 `vm` 或 `jsdom` 中配合 Firefox / Camoufox（SpiderMonkey）或 Safari（JavaScriptCore）UA 运行原始 SDK 时，若 SDK 调用 `new Error().stack`（或触发内部异常读取 `err.stack`）并用引擎特定正则提取脚本 URL 与行列号，会遇到三层隐蔽差异：① `vm.Script` 未指定 `filename` 时暴露 `evalmachine.<anonymous>`，且同步执行栈底部会带出 `node:vm` / `node:internal/*` 宿主帧；② V8 默认输出首行 `"Error"` 及 `"    at fn (url:line:col)"` 帧，而 SpiderMonkey 输出无首行且带尾随换行的 `"fn@url:line:col\n"`（JavaScriptCore 无尾随换行），导致内部正则返回 `null` 后紧接着取下标抛 `TypeError`，被 SDK 的 `try/catch` 静默吞掉并写入异常遥测槽位；③ 在 `node:vm` 中引擎自抛异常（如 `TypeError`）只会查找子 Realm 内建 `%Error%` 上的 `prepareStackTrace`（不能把外层 `globalThis.Error` 拷入沙箱代替），且 V8 默认 `Error.stackTraceLimit` 为可枚举属性（暴露在 `Object.keys(Error)` 中），直接赋值 `Error.prepareStackTrace = ...` 同样可枚举（若目标进一步枚举 `Object.getOwnPropertyNames(Error)`，需同步在 `Object.getOwnPropertyNames` 包装层过滤 `'prepareStackTrace'`、`'captureStackTrace'` 与 `'stackTraceLimit'`）：
+
+```javascript
+// 1) 加载 SDK 字节时传入真实脚本 HTTPS URL：
+//    new vm.Script(sdkSource, { filename: 'https://example.com/path/sdk.js' }).runInContext(ctx);
+// 2) jsdom 传 dom.window；裸 node:vm 传 ctx 并提供 vmModule 以取得子 Realm 内建 Error：
+function patchErrorStackFormat(win, engine = 'firefox', vmModule = null) {
+  if (!win || engine === 'chromium') return;
+  const TargetError = (vmModule && vmModule.isContext(win))
+    ? vmModule.runInContext('Error', win)
+    : win.Error;
+  if (!TargetError) return;
+
+  const formatNonV8Stack = (_err, structuredStackTrace) => {
+    const lines = structuredStackTrace
+      .filter((site) => {
+        const file = site.getFileName() || site.getEvalOrigin() || '';
+        return !file.startsWith('node:') && !file.startsWith('[eval]')
+          && !file.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(file);
+      })
+      .map((site) => {
+        const fn = site.getFunctionName() || site.getMethodName() || '';
+        const file = site.getFileName() || site.getEvalOrigin() || '';
+        const line = site.getLineNumber() || 0;
+        const col = site.getColumnNumber() || 0;
+        return `${fn}@${file}:${line}:${col}`;
+      });
+    const body = lines.join('\n');
+    return engine === 'firefox' && body ? `${body}\n` : body;
+  };
+
+  if (Object.prototype.hasOwnProperty.call(TargetError, 'stackTraceLimit')) {
+    Object.defineProperty(TargetError, 'stackTraceLimit', {
+      value: TargetError.stackTraceLimit,
+      writable: true,
+      enumerable: false,
+      configurable: true,
+    });
+  }
+  Object.defineProperty(TargetError, 'prepareStackTrace', {
+    value: formatNonV8Stack,
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
+}
+```
+
 ### 2. navigator.webdriver
 
 **问题**：jsdom 中 `navigator.webdriver` 为 `undefined`，真实浏览器为 `false`（Camoufox 在 C++ 层已处理）。
@@ -1045,6 +1095,8 @@ function patchEnvironment(win, doc, nav, options = {}) {
   // - 若目标创建 iframe 检测子窗口构造器/DOM 方法源码：在 ② 之后调 patchIframeChildRealms(win, helpers)
   // - 若目标检测 document/navigator 自有属性数量：补丁直接挂原型，或在 ⑤ 之后调 alignOwnAndProtoShape(...)
   // - 若目标实读 document.all 活性：以 node --allow-natives-syntax 启动并调 patchDocumentAll(...)
+  // - 若基线为 Firefox/Safari UA 且目标用正则解析 Error().stack：指定 vm.Script filename 并调 patchErrorStackFormat(win, 'firefox', vm)
+  // - 画布/WebGL 返回值先核对基线浏览器实测输出（含抗指纹全零摘要），勿盲目换入第三方原生渲染库
 }
 ```
 
