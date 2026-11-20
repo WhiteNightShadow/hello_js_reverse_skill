@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "mcp_version": "1.11.1",
+  "mcp_version": "1.12.0",
   "tools": [
     {
       "name": "check_environment",
@@ -574,6 +574,19 @@
             "title": "Tap Stage Calls",
             "type": "boolean"
           },
+          "inject": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Inject"
+          },
+          "inject_validate": {
+            "default": true,
+            "title": "Inject Validate",
+            "type": "boolean"
+          },
           "max_rewrites": {
             "default": 20000,
             "title": "Max Rewrites",
@@ -1082,6 +1095,21 @@
             "default": "",
             "title": "Source Url",
             "type": "string"
+          },
+          "url_pattern": {
+            "default": "",
+            "title": "Url Pattern",
+            "type": "string"
+          },
+          "find": {
+            "default": "",
+            "title": "Find",
+            "type": "string"
+          },
+          "occurrence": {
+            "default": 1,
+            "title": "Occurrence",
+            "type": "integer"
           },
           "remove_all": {
             "default": false,

@@ -100,7 +100,7 @@ trace_property_access(action="stop", mode="summary", collect_values=True)
 
 - **独立进程与状态隔离**：`rdp_debugger(action="launch")` 通过 `-start-debugger-server` 启动独立于 Playwright `launch_browser` 的浏览器进程和临时目录；两边的网络捕获、已注入 Hook、内存态 Cookie/Storage 不会自动互通。
 - **时序与调试面副作用**：断点暂停期间真实时钟（`Date.now()` / `performance.now()`）继续推进，恢复执行后极易触发时间差反调试（`链路 I`），且调试口开启了 `devtools.chrome.enabled`。不要把一次被断点停过的请求遭服务端拒绝当成“算法错”；抓清局部状态后，回到无断点的干净会话或离线环境做收口验证。
-- **动态脚本断点生命周期**：按 `source_url` 下的断点可在 `reload` 时自动重挂；对无 URL 的 `eval` / `new Function` 脚本按 `source`（`sourceId`）下的断点绑定在旧 `thread` 上，刷新或导航后返回 `reapply_skipped`，需在新线程重新定位。
+- **动态脚本断点生命周期**：固定 URL 脚本按 `source_url` 下的断点可在 `reload` 时自动重挂；当脚本 URL 携带每次变化的随机查询参数且代码列偏移按构建漂移时，用 MCP v1.12.0 起的 `set_breakpoint(url_pattern="...", find="...", occurrence=1)`，在 `reload` / `enable` 时自动匹配新脚本并重算 UTF-16 行列吸附重挂（通过返回值 `reapplied` / `reapply_failed` 核对状态，清理用 `remove_breakpoint(url_pattern=..., find=...)`）；对无 URL 的 `eval` / `new Function` 脚本按 `source`（`sourceId`）下的断点仍绑定在旧 `thread` 上，刷新后返回 `reapply_skipped`。
 - **列号基准与自动吸附**：工具入参 `column` 为 1-based（对齐 `Error.stack` 与 DevTools 面板），底层 RDP 为 0-based 并自动吸附到同行最近可停列；单行压缩脚本下断后务必核对返回值里的 `location`、`snapped_from_column_1based` 与 `breakable_positions`。
 - **配置继承降级与本地安全**：继承 `CAMOU_CONFIG` 指纹、无认证代理、`headless`、`os`、`locale`、`browser_version`；带认证代理、`headless="virtual"` 及原版 Firefox 下的降级项见返回值 `warnings`。RDP 端口无认证且具备主进程权限，macOS / Linux 优先传 `unix_socket=True`（`0700` 临时目录）；`attach` 模式关闭时不会删除外部浏览器的 socket；源码内含孤立 UTF-16 代理项时 `source` 会替换为 `U+FFFD` 并返回 `lone_surrogates_replaced`。
 

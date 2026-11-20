@@ -2,7 +2,7 @@
 
 目录：[1. 为什么需要源码级插桩](#1-为什么需要源码级插桩) · [2. 两种改写模式：regex vs AST](#2-两种改写模式regex-vs-ast) · [改写状态与运行时健康诊断](#改写状态与运行时健康诊断) · [3. 按需操作骨架](#3-按需操作骨架8-步) · [4. 进阶技巧](#4-进阶技巧) · [5. 常见问题与陷阱](#5-常见问题与陷阱) · [6. 源码级插桩的还原决策](#6-源码级插桩的还原决策) · [7. 参考](#7-参考)
 
-> **Skill v3.13.0 / MCP v1.8.0**（4.5 的阶段对照需要 MCP v1.9.4；日志切片、`rewrite_source` 离线改写和跳过原因需要 v1.10.0）。当前执行接口以 `instrumentation(action=...)` 为准；旧版 MCP 调用前检查实际工具 schema。
+> **Skill v3.13.0+ / MCP v1.8.0+**（4.5 的阶段对照需要 MCP v1.9.4；日志切片、`rewrite_source` 离线改写和跳过原因需要 v1.10.0；4.6 的源码级正则插桩需要 v1.12.0）。当前执行接口以 `instrumentation(action=...)` 为准；旧版 MCP 调用前检查实际工具 schema。
 >
 > 与 `jsvmp-analysis.md` 的第一/二/三板斧互补——前三板斧诊断"VM 看外界 / 外界看 VM"，本文档讲解"VM 看自己"。
 
@@ -394,6 +394,31 @@ MCP v1.10.0 起可以直接让 MCP 生成本地插桩文件，不用手写替换
 
 序列很长时按段比：`instrumentation(action="log", seq_window=[590, 610])` 取一段；在状态里发生的读取带 `stage`（最内层状态号），`instrumentation(action="log", stage=<p>)` 取某个状态里的事件；`stage_break(action="set", p=<p>)` 再 `reload`，能记下这个状态完整参数、返回值和调用栈的有界快照（页面加载时执行的状态也能记到）。
 
+### 4.6 按构建变化的非标准 VM：源码级正则插桩与本地落盘替换
+
+当目标 VM 不采用扁平化 `apply` 分发（`tap_stage_calls` 的 `total_edits=0`），且每次拉取脚本都会重新分配 `case` 编号或调整字节偏移时，不能绑定固定 opcode 编号，可改用 MCP v1.12.0 起的 `inject=[{find, before, after, group}]` 对跨构建稳定的语法结构（如寄存器槽位写入表达式）插入探针语句：
+
+```text
+instrumentation(
+  action="install",
+  url_pattern="**/<动态脚本>*.js*",
+  mode="regex",
+  rewrite_member_access=False,
+  rewrite_calls=False,
+  inject=[{
+    "group": "reg_write",
+    "find": "case\\s+(0x[0-9a-f]+):\\s*[A-Za-z_$][\\w$]*\\[[^\\]]+\\]\\s*=(?!=)",
+    "before": "if((window.__n=(window.__n||0)+1)<=2000)(window.__hits=window.__hits||[]).push($1)"
+  }]
+)
+instrumentation(action="reload")
+instrumentation(action="status")   # 核对 inject_hits、inject_skipped、inject_literal_skips 与 skipped_files
+evaluate_js(expression="window.__hits || []", world="main")   # 自注入全局在页面主世界读取
+```
+
+- **四层改写保护**：片段自动补齐分号并兼容行尾注释；词法扫描跳过字符串、注释、正则与嵌套 `${...}` 模板字面量内的命中（记入 `inject_literal_skips`；全部落在字面量内时 `skipped_files` 标记 `inject_literal_only`）；`before` 落在 `switch` 的 `case ...:` / `default:` 前时自动移至标签冒号之后；改写结果经 `esprima` / 随包 `Acorn` 语法校验（默认 `inject_validate=True`），破坏语法的组逐组回退（记入 `inject_skipped`；整文件零有效改写时 `skipped_files` 标记 `inject_would_break_syntax`）。注意不要在未完结的赋值号 `=` 之后直接用 `after` 插独立语句，优先用带 `(?!=)` 的 `before` 让标签偏移器把语句放在赋值之前。
+- **控制探针开销与落盘快迭代**：热循环内探针可能命中百万次，务必如上例用内联整数计数器限制推入上限，避免内存或时钟漂移污染载荷。若需离线精细改造 200KB+ 脚本并反复刷新调试，可先 `instrumentation(action="rewrite_source", ..., output_path="patched.js")`，再用 `intercept_request(url_pattern="...", action="mock", mock_response={"body_file": "patched.js"})` 按每次请求从磁盘重读（保存文件后 `reload` 即生效，验证完记得 `stop` 路由）。
+
 ---
 
 ## 5. 常见问题与陷阱
@@ -462,4 +487,4 @@ MCP v1.10.0 起可以直接让 MCP 生成本地插桩文件，不用手写替换
 - [骨架案例](../cases/universal-vmp-source-instrumentation.md)：模板，需当前适用性验证
 - [真实上游本地案例](../references/real-source-cases.md)：VM/CFF/CryptoJS/FingerprintJS 的来源与证据边界
 - [准备与验证脚本说明](../scripts/real_cases/README.md)：按需执行，本地通过不等于商业站点验证
-- [MCP 上游](https://github.com/WhiteNightShadow/camoufox-reverse-mcp)（本指南对齐 v1.8.0，4.5 节对齐 v1.9.4，日志切片和离线改写对齐 v1.10.0）
+- [MCP 上游](https://github.com/WhiteNightShadow/camoufox-reverse-mcp)（本指南对齐 v1.8.0，4.5 节对齐 v1.9.4，日志切片和离线改写对齐 v1.10.0，4.6 节对齐 v1.12.0）
