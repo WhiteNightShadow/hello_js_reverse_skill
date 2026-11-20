@@ -18,6 +18,7 @@
 | `acw_sc__v2` / Aliyun WAF | 签名型 | (待建) | (待建) |
 | `FSSBBIl1UgzbN7N` / `_RSG` / 200KB 混淆 JS + 412 | 签名型（RS） | 同 nmpa 案例 | sdenv |
 | `obfuscator.io` 特征（`_0x` 大量前缀） | 纯混淆线索 | (无专案，按当前问题选静态分析/四板斧步骤) | AST 反混淆与行为对照 |
+| `jsdVipUserMark` / `_yundunxhr` / `dewuCap` / `JS DUN PROTECT` / `.moveImg` + `captcha/blank.png` | 混合型（JSDUN eval-VM + 图集拖拽验证码 + XOR 流密码信封） | [`jsdun-evalvm-triple-sdk-draggrid-captcha-xor-stream.md`](./jsdun-evalvm-triple-sdk-draggrid-captcha-xor-stream.md) | 接管 `eval` 脱壳三件套；请求信封 `md5(明文)+XOR(KS=F(sk,UA))`、响应解密走 `Fun99` 静态表 + zlib；验证码**必须读 DOM**（图位每次随机）；`bgImage` 是答案的马赛克版可直接反查 |
 
 ### 使用方式
 
@@ -48,6 +49,7 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | [vm-stream-armour-and-boolean-oracle-isolation.md](vm-stream-armour-and-boolean-oracle-isolation.md) | **[v3.14 新，已脱敏]** 等长字节码流式护甲、压缩头产生固定密文前缀、粗粒度布尔判决下的分层变量隔离 | ★★★★ | R1：先离线往返锁死编码层，再校准单位换算并对照当前目标实测基线分布 | 不分类 |
 | [bitpacked-dual-vmp-slot-diff-and-realm-nativeness.md](bitpacked-dual-vmp-slot-diff-and-realm-nativeness.md) | **[v3.15 新，已脱敏]** 位打包双分发器 JSVMP、定长码点流逐槽反解消融、jsdom 原型链 / `document.all` / `iframe` 子 Realm 原生性校准 | ★★★★★ | R3：隔离在线改写与同页连调污染，反解槽位流过滤自抖动项后按浏览器快照单点消融 | 不分类 |
 | [per-build-polymorphic-vmp-and-composite-gate-ablation.md](per-build-polymorphic-vmp-and-composite-gate-ablation.md) | **[v3.16 新，已脱敏]** 按会话重编译多态 JSVMP、运行期窗口自证提密钥、`Error.stack` 跨引擎对齐与联合门禁金标准二分消融 | ★★★★★ | R3+R1：结构正则跨构建观测 + 运行期窗口频次与同次密文自证提密钥 + Step 0 自证与金标准折半消融 | 不分类 |
+| [jsdun-evalvm-triple-sdk-draggrid-captcha-xor-stream.md](jsdun-evalvm-triple-sdk-draggrid-captcha-xor-stream.md) | **JSDUN eval-VM 三件套 + 图集拖拽验证码 + 三层独立密钥**：eval 包自解码、请求信封绑 sk 的流密码、响应静态表 + zlib、验证码位置每次随机、`bgImage` 泄漏答案 | ★★★★★ | 接管 `eval`/`Function` 一键脱壳 → 分层标定三套密钥 → 验证码必须渲染后读 DOM（纯协议死结）→ 真人轨迹模板仿射 + 阈值闸门 + 三通道融合 | 混合型（签名 + 行为） |
 
 [historical-experience-rules.md](historical-experience-rules.md) 是 v3.10 之前的 30 条经验法则原文，含大量单站结论，只作历史追溯，每条的现状见 [旧规则去向](../references/experience-rules-full.md)。
 
