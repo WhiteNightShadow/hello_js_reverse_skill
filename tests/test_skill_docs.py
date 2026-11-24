@@ -24,7 +24,11 @@ EXTRA_SITE_TERMS = ['tiktok', 'douyin', '抖音', '瑞数', 'akamai', 'cloudflar
                     'zhipin', 'boss直聘', '直聘', 'zp_stoken', 'zptoken', 'zppassport', 'zpgeek', 'zpdata',
                     'security-js', '_security_check',
                     'edgeone', 'teocaptcha', 'tcaptcha', '天御', 'tdc.js', 'tdc_name', 'tdc_path',
-                    'cap_union', 'eo-bot', 'eo_bot', 'pow_cfg', 'pow_answer', '51cto', 'gtimg']
+                    'cap_union', 'eo-bot', 'eo_bot', 'pow_cfg', 'pow_answer', '51cto', 'gtimg',
+                    'jsdun', 'js dun', 'jsdvipusermark', '_yundunxhr', 'dewucap', 'dewu', '得物', 'poizon',
+                    'davstatic', 'pceptor', 'preinforce', 'pyuntu', 'fun99', 'fun110', 'yd_md5',
+                    'shumeiid', 'dwsm', 'feeds/info', 'websk', 'moveimg', 'blank.png', 'bgimage', 'bcv=',
+                    '048a9c4943398714b356a696503d2d36']
 # Removed tools may only be named in the migration table and the old-rule index.
 TOOL_ALLOWED = {'mcp-tool-reference.md', 'mcp-tools.json', 'experience-rules-full.md'}
 STALE_TOOLS = ['add_init_script', 'bypass_debugger_trap', 'dump_jsvmp_strings', 'get_runtime_probe_log',
@@ -87,7 +91,7 @@ class GenericMethodTests(unittest.TestCase):
     def test_desensitized_cases_do_not_leak_site_terms(self):
         desensitized = [path for path in sorted((ROOT / 'cases').glob('*.md'))
                         if '平台类型：通用（已脱敏）' in read(path)]
-        self.assertGreaterEqual(len(desensitized), 4)
+        self.assertGreaterEqual(len(desensitized), 5)
         self.assert_absent(sorted(case_keywords()) + EXTRA_SITE_TERMS, desensitized,
                            'Desensitized cases must stay free of site/vendor terms:')
 
