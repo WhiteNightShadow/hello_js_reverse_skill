@@ -104,6 +104,7 @@ SDK 常在首次读取后缓存。外部在初始化之后再刷新状态，可�
 3. **特殊宿主对象语义（如 `document.all`）**：普通对象和顶层 `Proxy` 无法同时满足 `typeof document.all === 'undefined'` 与活性集合访问；探针还常执行 `delete document.all[i]` 后复读以校验有效索引不可删除。在确认 SDK 实读该对象时，可在受控本地 Node 进程配合 `--allow-natives-syntax` 的 `%GetUndetectable()` 与 `Document.prototype.all` 实现（避免挂在 `document` 实例上增加自有属性），并记录该启动参数依赖。
 4. **忙等时钟、高频探针自伤与渲染摘要**：若 SDK 含依赖 `Date.now()` / `performance.now()` 推进的校验循环，将时间冻成常数会导致执行步数激增或落入异常分支，应改用「固定初值 + 单步微小递增」；同理，在 JSVMP 热寄存器或高频分发循环上每拍都调用外部 JS 回调会因时钟推进、对象分配或 `RegExp` 静态属性变化直接令产物变形，应改用内联整数计数器 + 步数窗口门控。Canvas / WebGL 像素输出受系统字体与图形栈影响，不做纯算式拟合，直接从同一基线浏览器采集真值固化。
 5. **跨内核 `Error.stack` 文本格式与抗指纹基线等价性**：在 Node `vm` / `jsdom`（V8）中配合 Firefox / Safari UA 运行 SDK 时，V8 默认的 `"Error\n    at ..."` 栈格式会让按 `fn@url:line:col` 编写的内部正则返回 `null` 并抛 `TypeError`，常被 SDK 外层 `try/catch` 静默捕获转写为异常遥测槽位——加载脚本时需通过 `vm.Script(..., { filename: scriptUrl })` 绑定真实脚本 URL，并用非枚举 `Error.prepareStackTrace` 对齐目标引擎栈文本。同时，若基线浏览器开启隐私或抗指纹保护（例如画布读回本身即为全零像素或固定受控摘要），本地轻量存根若已与基线实测输出一致，切勿盲目替换为第三方原生渲染库反而制造新差异。
+6. **子资源挂载条件与跨内核 UA 分支静默变形**：若 SDK 依赖动态插入 `<script>` 或子资源完成请求拦截器挂载，默认关闭子资源加载（或 `runScripts: 'outside-only'`）的 `JSDOM` 会出现「导出函数存在但拦截器从未触发」，需配置 `runScripts: 'dangerously'` 并接入只放行本地归档资源的受控 `ResourceLoader`（避免直接使用无过滤的 `resources: 'usable'` 发起真实外网请求破坏网络隔离）。此外，切换 Chromium 与 Firefox UA 分支可能同时改变 SDK 内部的流式密钥派生分支与响应解码函数的返回类型（如一侧返回明文 JSON 字符串、另一侧返回序列化的字节对象而不报错），本地运行时须严格锁定抓包基线的同一 UA 内核族。
 
 ## 隔离与预检
 
