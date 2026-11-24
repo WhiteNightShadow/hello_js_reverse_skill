@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "mcp_version": "1.12.0",
+  "mcp_version": "1.13.0",
   "tools": [
     {
       "name": "check_environment",
@@ -123,6 +123,19 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "output_file": {
+            "type": "string",
+            "title": "Output File"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
           }
         },
         "required": [
@@ -166,6 +179,20 @@
             "default": "auto",
             "title": "Result Format",
             "type": "string"
+          },
+          "output_file": {
+            "type": "string",
+            "title": "Output File"
+          },
+          "output_encoding": {
+            "default": "utf8",
+            "title": "Output Encoding",
+            "type": "string"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
           }
         },
         "required": [
@@ -218,6 +245,52 @@
           "save_path"
         ],
         "title": "export_stateArguments",
+        "type": "object"
+      }
+    },
+    {
+      "name": "extract_script",
+      "parameters": {
+        "properties": {
+          "request_id": {
+            "type": "integer",
+            "title": "Request Id"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "json_path": {
+            "default": "data.data",
+            "title": "Json Path",
+            "type": "string"
+          },
+          "output_file": {
+            "type": "string",
+            "title": "Output File"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
+          },
+          "allow_partial": {
+            "default": false,
+            "title": "Allow Partial",
+            "type": "boolean"
+          },
+          "preview_chars": {
+            "default": 120,
+            "title": "Preview Chars",
+            "type": "integer"
+          },
+          "max_inline_chars": {
+            "default": 20000,
+            "title": "Max Inline Chars",
+            "type": "integer"
+          }
+        },
+        "title": "extract_scriptArguments",
         "type": "object"
       }
     },
@@ -1549,6 +1622,20 @@
           "timeout": {
             "default": 30000,
             "title": "Timeout",
+            "type": "integer"
+          },
+          "mode": {
+            "default": "auto",
+            "title": "Mode",
+            "type": "string"
+          },
+          "after_id": {
+            "type": "integer",
+            "title": "After Id"
+          },
+          "poll_interval_ms": {
+            "default": 100,
+            "title": "Poll Interval Ms",
             "type": "integer"
           }
         },

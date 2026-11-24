@@ -18,7 +18,6 @@
 | `acw_sc__v2` / Aliyun WAF | 签名型 | (待建) | (待建) |
 | `FSSBBIl1UgzbN7N` / `_RSG` / 200KB 混淆 JS + 412 | 签名型（RS） | 同 nmpa 案例 | sdenv |
 | `obfuscator.io` 特征（`_0x` 大量前缀） | 纯混淆线索 | (无专案，按当前问题选静态分析/四板斧步骤) | AST 反混淆与行为对照 |
-| `xiaohongshu.com` / `XYS_` / `x-s-common` / `mnsv2` / `seccore_signv2` / `VTKBBQFM` | 签名型（换表 base64 + JSVMP 出值） | [`xhs-xys-envelope-dual-gen-mnsvmp-container.md`](./xhs-xys-envelope-dual-gen-mnsvmp-container.md) | `x5=md5(path+body)`；`x-s="XYS_"+换表b64(JSON{x0..x5})`；`x3=mnsv2(signStr,x5,md5(path))` 用 jsdom 离线跑站点实体；缺 `x-s-common`→461、缺 `x-s`→406、TLS 不像浏览器→461 |
 
 ### 使用方式
 
@@ -49,7 +48,8 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | [vm-stream-armour-and-boolean-oracle-isolation.md](vm-stream-armour-and-boolean-oracle-isolation.md) | **[v3.14 新，已脱敏]** 等长字节码流式护甲、压缩头产生固定密文前缀、粗粒度布尔判决下的分层变量隔离 | ★★★★ | R1：先离线往返锁死编码层，再校准单位换算并对照当前目标实测基线分布 | 不分类 |
 | [bitpacked-dual-vmp-slot-diff-and-realm-nativeness.md](bitpacked-dual-vmp-slot-diff-and-realm-nativeness.md) | **[v3.15 新，已脱敏]** 位打包双分发器 JSVMP、定长码点流逐槽反解消融、jsdom 原型链 / `document.all` / `iframe` 子 Realm 原生性校准 | ★★★★★ | R3：隔离在线改写与同页连调污染，反解槽位流过滤自抖动项后按浏览器快照单点消融 | 不分类 |
 | [per-build-polymorphic-vmp-and-composite-gate-ablation.md](per-build-polymorphic-vmp-and-composite-gate-ablation.md) | **[v3.16 新，已脱敏]** 按会话重编译多态 JSVMP、运行期窗口自证提密钥、`Error.stack` 跨引擎对齐与联合门禁金标准二分消融 | ★★★★★ | R3+R1：结构正则跨构建观测 + 运行期窗口频次与同次密文自证提密钥 + Step 0 自证与金标准折半消融 | 不分类 |
-| [xhs-xys-envelope-dual-gen-mnsvmp-container.md](xhs-xys-envelope-dual-gen-mnsvmp-container.md) | **[v3.17 新，已脱敏]** `XYS_` 换表 base64 信封 + 双代 JSVMP（`mns0201`/`mns0301`）+ VM 容器格式全解（magic / 隐写 XOR 键 / 前缀码常量池）+ jsdom 离线出值 | ★★★★☆ | R3：jsdom 跑站点实体（4 个 DOM 方法宽容兜底 + 真实 `b1` + Firefox UA）→ `mnsv2(sign,x5,md5(path))` 直出，无浏览器；三层失败码（406/461/200 内业务码）分层定位 | 签名型 |
+| [eval-packer-unwrapping-and-multilayer-codec-separation.md](eval-packer-unwrapping-and-multilayer-codec-separation.md) | **[v3.17 新，已脱敏]** 动态 `eval` 打包壳脱壳、参数/信封/响应三层独立密钥域隔离、Latin-1 二次 UTF-8 膨胀判读与单次会话配额边界 | ★★★★ | R3+R1：离线沙箱接管动态入口脱壳 + `jsdom` 标定绑定会话与 UA 的流式信封 + 静态表与 `zlib` 响应解码 | 不分类 |
+| [custom-b64-envelope-dual-gen-vmp-and-container-disassembly.md](custom-b64-envelope-dual-gen-vmp-and-container-disassembly.md) | **[v3.17 新，已脱敏]** 自定义换表 Base64 明文 JSON 信封、双代 JSVMP 前缀判读、字节码容器（魔数/隐写掩码/前缀码常量池）拆解与 `jsdom` 离线出值 | ★★★★ | R3+R0：三层状态码分层归因 + `[i<<2,0,0]` 探针提表 + `setter` 捕获覆盖式全局容器 + 最小宿主容错离线运行原始实体 | 不分类 |
 
 [historical-experience-rules.md](historical-experience-rules.md) 是 v3.10 之前的 30 条经验法则原文，含大量单站结论，只作历史追溯，每条的现状见 [旧规则去向](../references/experience-rules-full.md)。
 
@@ -67,7 +67,8 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | 等长无填充密文（固定前缀但搜不到魔数）+ HTTP 200 布尔判决 | vm-stream-armour-and-boolean-oracle-isolation | 中（分层锁死与往返验证方法） |
 | 位打包状态分发（移位掩码嵌套 `switch`）+ 浮动长度 Base64 令牌 + jsdom 原生性自证 | bitpacked-dual-vmp-slot-diff-and-realm-nativeness | 中（定长槽位反解消融与子 Realm / `document.all` 原生性校准） |
 | 每次拉取脚本字节哈希与 opcode 编号均变化 + 内嵌会话分组密钥 + 多槽联合门禁 | per-build-polymorphic-vmp-and-composite-gate-ablation | 中（结构正则跨构建定位、运行期窗口自证提密钥与金标准折半消融） |
-| `XYS_` 前缀令牌 + 可解出明文 JSON + `mns0201_`/`mns0301_` 双代前缀 + 容器 magic `VTKBBQFM` | xhs-xys-envelope-dual-gen-mnsvmp-container | 高（换表 base64 信封 + jsdom 离线跑 JSVMP 实体） |
+| 外层 `eval(function(...){...})` 多脚本包 + 请求/响应异或密钥流互不通 + Base64 解码约 `1.5×` 膨胀 | eval-packer-unwrapping-and-multilayer-codec-separation | 中（离线动态脱壳、三层独立编解码隔离与单次会话配额判读） |
+| 固定前缀 64 字符集外层信封可解明文 JSON + 内层双代版本前缀并存 + 覆盖式全局容器与空种子 9 字符退化串 | custom-b64-envelope-dual-gen-vmp-and-container-disassembly | 中（`[i<<2,0,0]` 探针提表、多状态码分层归因、容器拆解与 `jsdom` 离线出值） |
 
 ## 变体关系图
 
