@@ -49,6 +49,7 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | [bitpacked-dual-vmp-slot-diff-and-realm-nativeness.md](bitpacked-dual-vmp-slot-diff-and-realm-nativeness.md) | **[v3.15 新，已脱敏]** 位打包双分发器 JSVMP、定长码点流逐槽反解消融、jsdom 原型链 / `document.all` / `iframe` 子 Realm 原生性校准 | ★★★★★ | R3：隔离在线改写与同页连调污染，反解槽位流过滤自抖动项后按浏览器快照单点消融 | 不分类 |
 | [per-build-polymorphic-vmp-and-composite-gate-ablation.md](per-build-polymorphic-vmp-and-composite-gate-ablation.md) | **[v3.16 新，已脱敏]** 按会话重编译多态 JSVMP、运行期窗口自证提密钥、`Error.stack` 跨引擎对齐与联合门禁金标准二分消融 | ★★★★★ | R3+R1：结构正则跨构建观测 + 运行期窗口频次与同次密文自证提密钥 + Step 0 自证与金标准折半消融 | 不分类 |
 | [eval-packer-unwrapping-and-multilayer-codec-separation.md](eval-packer-unwrapping-and-multilayer-codec-separation.md) | **[v3.17 新，已脱敏]** 动态 `eval` 打包壳脱壳、参数/信封/响应三层独立密钥域隔离、Latin-1 二次 UTF-8 膨胀判读与单次会话配额边界 | ★★★★ | R3+R1：离线沙箱接管动态入口脱壳 + `jsdom` 标定绑定会话与 UA 的流式信封 + 静态表与 `zlib` 响应解码 | 不分类 |
+| [custom-b64-envelope-dual-gen-vmp-and-container-disassembly.md](custom-b64-envelope-dual-gen-vmp-and-container-disassembly.md) | **[v3.17 新，已脱敏]** 自定义换表 Base64 明文 JSON 信封、双代 JSVMP 前缀判读、字节码容器（魔数/隐写掩码/前缀码常量池）拆解与 `jsdom` 离线出值 | ★★★★ | R3+R0：三层状态码分层归因 + `[i<<2,0,0]` 探针提表 + `setter` 捕获覆盖式全局容器 + 最小宿主容错离线运行原始实体 | 不分类 |
 
 [historical-experience-rules.md](historical-experience-rules.md) 是 v3.10 之前的 30 条经验法则原文，含大量单站结论，只作历史追溯，每条的现状见 [旧规则去向](../references/experience-rules-full.md)。
 
@@ -67,6 +68,7 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | 位打包状态分发（移位掩码嵌套 `switch`）+ 浮动长度 Base64 令牌 + jsdom 原生性自证 | bitpacked-dual-vmp-slot-diff-and-realm-nativeness | 中（定长槽位反解消融与子 Realm / `document.all` 原生性校准） |
 | 每次拉取脚本字节哈希与 opcode 编号均变化 + 内嵌会话分组密钥 + 多槽联合门禁 | per-build-polymorphic-vmp-and-composite-gate-ablation | 中（结构正则跨构建定位、运行期窗口自证提密钥与金标准折半消融） |
 | 外层 `eval(function(...){...})` 多脚本包 + 请求/响应异或密钥流互不通 + Base64 解码约 `1.5×` 膨胀 | eval-packer-unwrapping-and-multilayer-codec-separation | 中（离线动态脱壳、三层独立编解码隔离与单次会话配额判读） |
+| 固定前缀 64 字符集外层信封可解明文 JSON + 内层双代版本前缀并存 + 覆盖式全局容器与空种子 9 字符退化串 | custom-b64-envelope-dual-gen-vmp-and-container-disassembly | 中（`[i<<2,0,0]` 探针提表、多状态码分层归因、容器拆解与 `jsdom` 离线出值） |
 
 ## 变体关系图
 

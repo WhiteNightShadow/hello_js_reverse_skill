@@ -63,12 +63,13 @@ new Function('return ' + decryptedCode)()
 
 **还原步骤**：
 1. **先区分自解压打包壳与真字节码 VM**：外层为大段紧凑字符串并在初始化期调用 `eval` / `Function` 的脚本，往往在运行期直接还原出数百 KB 的可读 JS 源码，先脱壳确认内层是否已是普通模块，避免误入字节码逆向
-2. **优先在离线沙箱脱壳顶层打包壳，并区分直接/间接 `eval` 作用域**：在断网的本地 `node:vm` 沙箱中包装 `eval` 与 `Function` 可将顶层自包含打包器传入的代码按序号写入文件并记录 `bytes + sha256`。注意按语言规范，任何 JS 层包装都会使 `SameValue(func, %eval%)` 为假、退化为间接 `eval`（无法访问外层函数局部词法变量，在真实页面覆写 `window.eval` 还会改变宿主行为）；若内层依赖闭包局部变量的直接 `eval`，应保持原生 `eval` 引用不变而将调用改写为 `eval(__tap(expr))` 或在独立观察会话用原生断点读取。若动态脚本装在异步 JSON 响应字段内，可从已捕获响应中按 JSON 路径提取落盘。
+2. **优先在离线沙箱脱壳顶层打包壳，并区分直接/间接 `eval` 作用域**：在断网的本地 `node:vm` 沙箱中包装 `eval` 与 `Function` 可将顶层自包含打包器传入的代码按序号写入文件并记录 `bytes + sha256`。注意按语言规范，任何 JS 层包装都会使 `SameValue(func, %eval%)` 为假、退化为间接 `eval`（无法访问外层函数局部词法变量，在真实页面覆写 `window.eval` 还会改变宿主行为）；若内层依赖闭包局部变量的直接 `eval`，应保持原生 `eval` 引用不变而将调用改写为 `eval(__tap(expr))` 或在独立观察会话用原生断点读取。若动态脚本装在异步 JSON 响应字段内（无 `<script src>` 资源，`search_code` 与静态路由改写不可见），直接用 `extract_script(request_id=..., json_path="...", output_file=...)` 提取落盘，离线通过 `instrumentation(action="rewrite_source")` 打点后再用 `intercept_request(action="mock", mock_response={"body_file": ...})` 回灌验证。
 3. 可能有多层嵌套或多脚本协同，逐层落盘后再做静态搜索与模块分工梳理
 
 **MCP 辅助**：
 ```
-[camoufox-reverse] scripts(action='save', url=..., save_path=...) → 保存原始打包脚本到本地离线脱壳
+[camoufox-reverse] scripts(action='save', url=..., save_path=...) → 保存常规 <script src> 打包脚本到本地离线脱壳
+[camoufox-reverse] extract_script(request_id=..., json_path="data.script", output_file=...) → 提取 fetch+eval 型 JSON 响应内嵌脚本落盘
 [camoufox-reverse] hook_function(function_path="Function", mode="trace", persistent=True, world="main")
 ```
 
