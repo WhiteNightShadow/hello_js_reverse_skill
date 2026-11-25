@@ -19,6 +19,7 @@
 | `FSSBBIl1UgzbN7N` / `_RSG` / 200KB 混淆 JS + 412 | 签名型（RS） | 同 nmpa 案例 | sdenv |
 | `obfuscator.io` 特征（`_0x` 大量前缀） | 纯混淆线索 | (无专案，按当前问题选静态分析/四板斧步骤) | AST 反混淆与行为对照 |
 | `jsdVipUserMark` / `_yundunxhr` / `dewuCap` / `JS DUN PROTECT` / `.moveImg` + `captcha/blank.png` | 混合型（JSDUN eval-VM + 图集拖拽验证码 + XOR 流密码信封） | [`jsdun-evalvm-triple-sdk-draggrid-captcha-xor-stream.md`](./jsdun-evalvm-triple-sdk-draggrid-captcha-xor-stream.md) | 接管 `eval` 脱壳三件套；请求信封 `md5(明文)+XOR(KS=F(sk,UA))`、响应解密走 `Fun99` 静态表 + zlib；验证码**必须读 DOM**（图位每次随机）；`bgImage` 是答案的马赛克版可直接反查 |
+| `haohuo.jinritemai.com` / `ec.snssdk.com` / `promotion/pack/h5` / `10001010A` / `userproductnum` | 行为型（多入口判据分离：登录态门 vs 签名门） | [`multi-entry-h5-detail-login-gate-vs-sign-gate.md`](./multi-entry-h5-detail-login-gate-vs-sign-gate.md) | 零字节响应先换入口比判据；老版 `ec.snssdk.com` 只校验登录态并直译为「未登录」；`ttwid` 可 `union/register` 自建；`get_network_request` 取完整 URL 再判签名有无 |
 
 ### 使用方式
 
@@ -52,6 +53,7 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | [jsdun-evalvm-triple-sdk-draggrid-captcha-xor-stream.md](jsdun-evalvm-triple-sdk-draggrid-captcha-xor-stream.md) | **JSDUN eval-VM 三件套 + 图集拖拽验证码 + 三层独立密钥**：eval 包自解码、请求信封绑 sk 的流密码、响应静态表 + zlib、验证码位置每次随机、`bgImage` 泄漏答案 | ★★★★★ | 接管 `eval`/`Function` 一键脱壳 → 分层标定三套密钥 → 验证码必须渲染后读 DOM（纯协议死结）→ 真人轨迹模板仿射 + 阈值闸门 + 三通道融合 | 混合型（签名 + 行为） |
 | [eval-packer-unwrapping-and-multilayer-codec-separation.md](eval-packer-unwrapping-and-multilayer-codec-separation.md) | **[v3.17 新，已脱敏]** 动态 `eval` 打包壳脱壳、参数/信封/响应三层独立密钥域隔离、Latin-1 二次 UTF-8 膨胀判读与单次会话配额边界 | ★★★★ | R3+R1：离线沙箱接管动态入口脱壳 + `jsdom` 标定绑定会话与 UA 的流式信封 + 静态表与 `zlib` 响应解码 | 不分类 |
 | [custom-b64-envelope-dual-gen-vmp-and-container-disassembly.md](custom-b64-envelope-dual-gen-vmp-and-container-disassembly.md) | **[v3.17 新，已脱敏]** 自定义换表 Base64 明文 JSON 信封、双代 JSVMP 前缀判读、字节码容器（魔数/隐写掩码/前缀码常量池）拆解与 `jsdom` 离线出值 | ★★★★ | R3+R0：三层状态码分层归因 + `[i<<2,0,0]` 探针提表 + `setter` 捕获覆盖式全局容器 + 最小宿主容错离线运行原始实体 | 不分类 |
+| [multi-entry-h5-detail-login-gate-vs-sign-gate.md](multi-entry-h5-detail-login-gate-vs-sign-gate.md) | **[v3.17.1 新]** 同平台多入口判据分离：新版 BFF 三件套签名 + 环境门给出零字节响应，老版 BFF 仅校验登录态并直译「未登录」；含 `ttwid` 自建流程与 URL 预览截断导致的误判纠偏 | ★★☆☆☆ | R6 取证 → 换入口比判据 → 定层为登录态（未进入签名还原） | 行为型（判据分层） |
 
 [historical-experience-rules.md](historical-experience-rules.md) 是 v3.10 之前的 30 条经验法则原文，含大量单站结论，只作历史追溯，每条的现状见 [旧规则去向](../references/experience-rules-full.md)。
 
@@ -71,6 +73,7 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | 每次拉取脚本字节哈希与 opcode 编号均变化 + 内嵌会话分组密钥 + 多槽联合门禁 | per-build-polymorphic-vmp-and-composite-gate-ablation | 中（结构正则跨构建定位、运行期窗口自证提密钥与金标准折半消融） |
 | 外层 `eval(function(...){...})` 多脚本包 + 请求/响应异或密钥流互不通 + Base64 解码约 `1.5×` 膨胀 | eval-packer-unwrapping-and-multilayer-codec-separation | 中（离线动态脱壳、三层独立编解码隔离与单次会话配额判读） |
 | 固定前缀 64 字符集外层信封可解明文 JSON + 内层双代版本前缀并存 + 覆盖式全局容器与空种子 9 字符退化串 | custom-b64-envelope-dual-gen-vmp-and-container-disassembly | 中（`[i<<2,0,0]` 探针提表、多状态码分层归因、容器拆解与 `jsdom` 离线出值） |
+| 同一业务数据两条前端入口判据不同 + 一条回零字节、另一条回「未登录」文案 | multi-entry-h5-detail-login-gate-vs-sign-gate | 中（零字节先换入口比判据，登录态门与签名门分离） |
 
 ## 变体关系图
 

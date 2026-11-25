@@ -7,7 +7,7 @@ description: >
   配套 Camoufox MCP 取证，交付可验证的采集程序，支持分页、断点续采和改版回归。
   仅用于自有或已授权接口；微信小程序 wxapkg 解包使用对应小程序技能。
 metadata:
-  version: "3.17.0"
+  version: "3.17.1"
   mcp-compatible: "1.8.0（旧工作流兼容 1.6.x / 1.7.x；新参数需对应工具 schema；hook_jsvmp_interpreter 需 1.9.3；tap_stage_calls 需 1.9.4；rewrite_source、日志切片、环境包导出需 1.10.0；rdp_debugger 原生断点需 1.11.0+；inject 源码正则插桩、mock body_file、正则跨刷新断点需 1.12.0+；extract_script 与证据直落盘需 1.13.0+）"
 ---
 
@@ -51,6 +51,7 @@ metadata:
 | 带 sign、token 或自定义头，还没动手 | 这个参数一定要算 | 重放成功请求，再按组删减 | [链路 A](references/problem-routing.md#链路-a这个参数到底要不要算) |
 | 别的接口或别的端需要某个头 | 这里也需要 | 按本接口单独验证，多发也可能被拒 | [链路 A](references/problem-routing.md#链路-a这个参数到底要不要算) |
 | HTTP 200 里是错误码、空数据或错误页 | 签名或环境错了 | 读业务码，对比同期成功样本 | [链路 B](references/problem-routing.md#链路-b服务端拒绝) |
+| HTTP 200 但响应体 0 字节或只有空壳字段 | 签名缺失或算错了 | 换入口或换端取同一份数据，先比判据再谈签名 | [链路 B](references/problem-routing.md#链路-b服务端拒绝) |
 | 本地值结构合法但被拒 | 算法错了 | 恢复控制组，做来源替换 | [链路 B](references/problem-routing.md#链路-b服务端拒绝) |
 | 控制组也失败 | 候选失败了 | 停止归因，先恢复基线 | [控制组失效](references/controlled-experiments.md#控制组失效) |
 | 超时、连接失败、没发出去 | 被拒绝了 | 单独分类，确认实际尝试次数 | [结果分类](references/controlled-experiments.md#结果分类) |
@@ -148,6 +149,7 @@ metadata:
 
 ## 更新记录
 
+- v3.17.1（2026-11-25）：链路 B 增加「先看响应体积与文案形态」的三分表——业务码拒绝、**响应体 0 字节/空壳**、带明确文案的业务码各自动不同层；指出零字节响应与签名算错的对外现象常不可区分，先换入口或换端取同一份数据比判据；`list_network_requests` 的 URL 预览在 MCP v1.13.1 起带 `…` 与 `url_truncated`，读参数或签名前先取完整 URL；新增同平台多入口判据差异案例。
 - v3.17.0（2026-11-24）：新增动态 `eval` 打包壳离线脱壳、三层独立编解码密钥域隔离、Latin-1 二次 UTF-8 膨胀判读、`[i<<2,0,0]` 黑盒恢复自定义 Base64 表、多状态码门禁归因、双代 JSVMP 前缀与字节码容器拆解及空种子退化串 S1 断言，补充两篇通用脱敏案例；同步 MCP v1.13.0（43 个工具，含 `extract_script`、证据直落盘与死会话自愈）。
 - v3.16.0（2026-11-20）：新增多槽联合阈值门禁的 Step 0 未消费样本往返自证与金标准成组折半消融、多态字节码运行期窗口读频与同次密文结构自证提密钥、`patchErrorStackFormat` 跨内核栈格式补丁与基线等价性原则及通用脱敏案例；同步 MCP v1.12.0（`inject` 源码正则插桩、`mock_response.body_file`、正则跨刷新断点）。
 - v3.15.0（2026-11-18）：新增 jsdom 子 Realm 原型链与 `toString` 修补、实例/原型属性描述符对齐、`Document.prototype.all` 引擎级 undetectable 活性集合补丁，以及在线改写路由残留核查、定长码点流逐槽反解与同侧 A/A 自抖动槽过滤方法及脱敏案例；工具快照同步至 MCP v1.11.1。
