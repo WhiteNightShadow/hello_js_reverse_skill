@@ -200,15 +200,15 @@ python main.py
 | `get_trace_data` | 读取或清理函数 Trace，可按 world 与 Frame 过滤 |
 | `inject_hook_preset` | 一键预设 Hook（xhr/fetch/crypto/websocket/debugger_bypass/cookie/runtime_probe）；MCP v1.10.0 起装在页面主世界，日志用 `world='main'` 读 |
 | `hook_jsvmp_interpreter` | 一键插桩 JSVMP 解释器（proxy / transparent 两种模式） |
-| `instrumentation(action='install'\|'log'\|'stop'\|'reload'\|'rewrite_source')` | 源码级插桩：HTTP 层改写 VMP + 日志 + 重载；`tap_stage_calls` 按状态记录平坦化分发（MCP v1.9.4）；日志按 `seq`/`stage` 切片、`rewrite_source` 离线改写本地源码（MCP v1.10.0） |
+| `instrumentation(action='install'\|'log'\|'stop'\|'reload'\|'rewrite_source')` | 源码级插桩：HTTP 层改写 VMP + 日志 + 重载；`tap_stage_calls` 按状态记录平坦化分发（MCP v1.9.4）；日志按 `seq`/`stage` 切片、`rewrite_source` 离线改写本地源码（MCP v1.10.0）；`inject` 源码级结构正则插桩（MCP v1.12.0） |
 | `network_capture(action='start'\|'stop')` | 网络捕获（支持 capture_body） |
 | `list_network_requests` / `get_network_request` | 列出/获取捕获的请求 |
 | `get_request_initiator` | 获取发起请求的 JS 调用栈（黄金路径） |
-| `intercept_request` | 拦截/修改/Mock 网络请求 |
+| `intercept_request` | 拦截/修改/Mock 网络请求（MCP v1.12.0 起支持 `mock_response.body_file` 按请求从磁盘重读大脚本） |
 | `cookies(action='get'\|'set'\|'delete')` | Cookie 管理 |
 | `compare_env` | 采集 JS 环境基线；其他属性需通过 `properties` 或分批 `evaluate_js` 扩展；MCP v1.10.0 起 `output_path` 导出完整环境包 |
 | `trace_property_access(action=...)` | reverse.5 的 77 点 Gecko 原生追踪（旧兼容构建为 75 点）；支持 start→操作→stop、kind/site 过滤和覆盖边界 |
-| `rdp_debugger(action=...)` | Firefox 原生 RDP 断点调试：真断点、单步、调用栈、词法作用域、暂停帧求值与 `xhr_breakpoint` 发包前断点（独立观察会话，MCP v1.11.0） |
+| `rdp_debugger(action=...)` | Firefox 原生 RDP 断点调试：真断点、单步、调用栈、词法作用域、暂停帧求值与 `xhr_breakpoint` 发包前断点（MCP v1.11.0；v1.12.0 新增 `url_pattern` + `find` 跨刷新正则断点） |
 | `verify_signer_offline` | 用真实样本离线验证签名代码 |
 | `export_state` / `import_state` | 保存/恢复浏览器状态 |
 | `check_environment` / `reset_browser_state` | 环境自检 / 清理残留状态 |
@@ -262,12 +262,14 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.11.1**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级插桩、Firefox 原生 RDP 断点调试与可选 Gecko 原生属性追踪）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.13.0**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级 AST/结构正则插桩、`extract_script` 动态载荷提取与证据直落盘、按请求磁盘 Mock、Firefox 原生 RDP 正则断点调试与可选 Gecko 原生属性追踪）
 
 ## 版本记录
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.17.0 | 2026-11-24 | 新增动态 `eval` 打包壳脱壳、三层独立密钥域与二次 UTF-8 膨胀判读、`[i<<2,0,0]` 黑盒恢复自定义 Base64 表、多状态码门禁分层、双代 JSVMP 前缀与字节码容器拆解、空种子退化串 S1 断言及两篇脱敏案例；同步 MCP v1.13.0（43 个工具，含 `extract_script`、证据直落盘与死会话自愈） |
+| v3.16.0 | 2026-11-20 | 新增联合阈值门禁 Step 0 往返自证与金标准折半消融、多态字节码运行期窗口自证提密钥、`patchErrorStackFormat` 跨内核栈格式补丁与脱敏案例；同步 MCP v1.12.0（`inject`、`body_file`、跨刷新正则断点） |
 | v3.15.0 | 2026-11-18 | 新增 jsdom 子 Realm 原型链与 `toString`、自有/原型描述符对齐、`Document.prototype.all` 活性集合补丁；补充在线改写路由残留核查、定长码点流逐槽反解消融与脱敏案例，同步 MCP v1.11.1 快照 |
 | v3.14.0 | 2026-11-15 | 配合 MCP v1.11.0：补充原生断点调试（`rdp_debugger`）证据边界并同步 42 工具快照；新增等长流式护甲与布尔判决分层锁死方法及脱敏案例 |
 | v3.13.0 | 2026-11-12 | 配合 MCP v1.10.0：插桩默认值、日志切片、离线插桩、preset 主世界；新增环境包套用模板 `templates/env-bundle/` |
@@ -292,7 +294,7 @@ python main.py
 
 ## 社区贡献者
 
-- [@Moojing-jianchuan](https://github.com/Moojing-jianchuan) — 等长字节码流式变换与粗粒度布尔判决分层隔离实践案例（#8），位打包双分发器定长槽位消融与 jsdom 原生性/子 Realm 校准实践案例（#9），以及配套 MCP 的阶段插桩、离线插桩与 Firefox RDP 断点调试反馈与共建
+- [@Moojing-jianchuan](https://github.com/Moojing-jianchuan) — 等长字节码流式变换与粗粒度布尔判决分层隔离（#8）、位打包双分发器定长槽位消融与 jsdom 原生性/子 Realm 校准（#9）、多态 JSVMP 窗口自证提密钥与联合门禁折半消融（#10）、动态 `eval` 脱壳与多层编解码/配额边界隔离（#12）、自定义 Base64 探针提表与双代 JSVMP 容器拆解（#13）实践案例，以及配套 MCP 的阶段插桩、源码正则插桩（`inject`）、`extract_script` 载荷脚本提取、通用证据落盘、死会话自愈与 Firefox RDP 断点调试共建
 
 ## 许可证
 

@@ -35,6 +35,13 @@ MCP v1.7.0 能力（调用前通过当前工具 schema 确认）：
 - 网络列表旧 `size` 是字符数，`body_bytes` 才是保存的正文实体字节数；详情 `response_body_total_bytes` 也是解压后的实体字节，不直接与压缩 Content-Length 比较。
 - 大段源码/二进制优先保存后本地分析；模型只读摘要、相关片段和验证结果。WASM 需校验文件哈希、imports/exports 和真实调用，不能仅凭文件名/截图判定成功。
 
+MCP v1.13.0 证据直落盘与死会话自愈边界：
+
+- `extract_script(request_id=..., json_path=..., output_file=...)` 用于提取经异步接口返回再 `eval` 的动态脚本（无 `<script src>` 资源）；默认 `allow_partial=False` 会拒绝被 `max_body_size` 截断的响应体，遇到报错应调大 `network_capture(max_body_size=...)` 重采而非带残缺半截脚本继续分析。
+- `evaluate_js(..., output_file=..., output_encoding="utf8"|"base64")` 适合将运行期解出的大字符串或字节数组（在页面侧转 Base64）直接原子落盘，仅返回短预览与 `sha256`；传入 `cookies(action="header", output_file=...)` 时文件以 `0600` 权限落盘且返回 `header=None`，避免长凭据暴露到对话记录。
+- `wait_for(url_pattern=..., mode="request", after_id=...)` 会等待匹配请求及其响应体收尾（非 `pending`）后再返回，可安全衔接 `save_response_body` 或 `extract_script`。
+- 当全部标签页关闭或浏览器连接意外断开后，重新调用 `launch_browser()` 会自动清理失效句柄并拉起新实例（返回 `recovered_stale_session=True` 及 `warnings`）；注意旧会话内存中的网络捕获、活动插桩路由与持久 Hook 均已随死会话清空，需按需重新开启采集或路由。
+
 使用旧 MCP 时先查看已安装工具定义，不传新参数；保留原有 `network_capture/list_network_requests/get_network_request` 调用方式即可。
 
 ## 观测对行为的影响
