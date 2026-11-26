@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 
 
@@ -37,6 +38,7 @@ def parse_identities(items):
 
 
 def main():
+    if hasattr(sys.stdout,'reconfigure'):sys.stdout.reconfigure(encoding='utf-8')
     parser=argparse.ArgumentParser(description='Record SDK/signer/fixture hashes for upgrade reviews')
     parser.add_argument('action',choices=['create','check'])
     parser.add_argument('--root',default='.')

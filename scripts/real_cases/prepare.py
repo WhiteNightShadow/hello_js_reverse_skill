@@ -188,7 +188,7 @@ def run_step(output, cwd, label, command, env):
 
 
 def dependency_inventory(root):
-    lock = json.loads((root / "package-lock.json").read_text())
+    lock = json.loads((root / "package-lock.json").read_text(encoding="utf-8"))
     records = []
     for location, metadata in sorted(lock["packages"].items()):
         if not location:
@@ -199,7 +199,7 @@ def dependency_inventory(root):
                   "integrity": metadata.get("integrity"), "resolved": metadata.get("resolved"),
                   "optional": metadata.get("optional", False), "installed": package.is_file()}
         if package.is_file():
-            actual = json.loads(package.read_text())
+            actual = json.loads(package.read_text(encoding="utf-8"))
             if actual["version"] != metadata["version"]:
                 raise ValueError(f"Installed dependency version mismatch: {location}")
             record.update(name=actual["name"], license=actual.get("license", actual.get("licenses")),
@@ -218,8 +218,8 @@ def dependency_inventory(root):
 
 
 def validate_lock(root):
-    package = json.loads((root / "package.json").read_text())
-    lock = json.loads((root / "package-lock.json").read_text())
+    package = json.loads((root / "package.json").read_text(encoding="utf-8"))
+    lock = json.loads((root / "package-lock.json").read_text(encoding="utf-8"))
     if lock.get("lockfileVersion") != 3:
         raise ValueError("Expected a v3 fixed lockfile")
     for field in ("dependencies", "devDependencies"):
@@ -258,7 +258,7 @@ def prepare(output, cache=None):
             for name in ("evidence", "licenses", "samples"):
                 (output / area / name).mkdir(exist_ok=True)
             validate_lock(output / area)
-        for pin in json.loads((HERE / "sources.json").read_text()):
+        for pin in json.loads((HERE / "sources.json").read_text(encoding="utf-8")):
             archive, evidence = fetch_archive(pin, output / "downloads", cache)
             dest = output / pin["destination"]
             evidence["files"] = extract_archive(archive, dest, f"{pin['name']}-{pin['commit']}")
@@ -274,8 +274,8 @@ def prepare(output, cache=None):
         env = build_env(output)
         for name in (".npmrc", ".npmrc-global"):
             (output / name).write_text("ignore-scripts=true\nregistry=https://registry.npmjs.org/\n", encoding="utf-8")
-        report["node"] = subprocess.check_output([node, "--version"], env=env, text=True).strip()
-        report["npm"] = subprocess.check_output([npm, "--version"], env=env, text=True).strip()
+        report["node"] = subprocess.check_output([node, "--version"], env=env, text=True, encoding="utf-8").strip()
+        report["npm"] = subprocess.check_output([npm, "--version"], env=env, text=True, encoding="utf-8").strip()
         if int(report["node"].lstrip("v").split(".")[0]) < 18:
             raise ValueError("Node.js >=18 is required")
         for area in ("vm-cff", "crypto-fingerprint"):

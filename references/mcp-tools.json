@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "mcp_version": "1.13.0",
+  "mcp_version": "1.13.1",
   "tools": [
     {
       "name": "check_environment",

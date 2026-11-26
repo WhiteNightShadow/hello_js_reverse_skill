@@ -49,7 +49,7 @@ class CollectorTests(unittest.TestCase):
             result=collect_to_jsonl(**args,max_pages=2,resume=True)
             self.assertEqual(result['status'],'complete')
             self.assertEqual(calls,[1,2])
-            self.assertEqual([json.loads(x)['id'] for x in output.read_text().splitlines()],[1,2,3])
+            self.assertEqual([json.loads(x)['id'] for x in output.read_text(encoding='utf-8').splitlines()],[1,2,3])
             collect_to_jsonl(**args,resume=True)
             self.assertEqual(calls,[1,2])
 
@@ -71,7 +71,7 @@ class CollectorTests(unittest.TestCase):
                       output_path=output,job_key='fixture')
             with self.assertRaises(ValueError):
                 collect_to_jsonl(lambda c: {'error':'not a list'},**args)
-            state=json.loads(Path(str(output)+'.checkpoint.json').read_text())
+            state=json.loads(Path(str(output)+'.checkpoint.json').read_text(encoding='utf-8'))
             self.assertEqual(state['pages'],0)
             self.assertEqual(output.read_bytes(),b'')
             self.assertEqual(collect_to_jsonl(lambda c:[1],**args,resume=True)['items'],1)
@@ -97,9 +97,9 @@ class CollectorTests(unittest.TestCase):
                       output_path=output,job_key='fixture')
             lock=Path(str(output)+'.lock');lock.touch()
             with self.assertRaises(FileExistsError): collect_to_jsonl(**args)
-            lock.unlink();output.write_text('user data')
+            lock.unlink();output.write_text('user data',encoding='utf-8')
             with self.assertRaises(FileExistsError): collect_to_jsonl(**args)
-            self.assertEqual(output.read_text(),'user data')
+            self.assertEqual(output.read_text(encoding='utf-8'),'user data')
 
 
 class CollectorOptionsTests(unittest.TestCase):
@@ -117,7 +117,7 @@ class CollectorOptionsTests(unittest.TestCase):
         return {'items': [{'id': key} for key in ids], 'next': following}
 
     def state(self):
-        return json.loads(self.checkpoint.read_text())
+        return json.loads(self.checkpoint.read_text(encoding='utf-8'))
 
     def snapshot(self):
         return self.output.read_bytes(), self.checkpoint.read_bytes()
@@ -153,7 +153,7 @@ class CollectorOptionsTests(unittest.TestCase):
         self.assertEqual(snapshots[2], snapshots[3])
         self.assertEqual((result['pages'], result['items']), (2, 2))
         self.assertEqual(self.state()['seen_keys'], ['1', '2'])
-        self.assertEqual([json.loads(line)['id'] for line in self.output.read_text().splitlines()], [1, 2])
+        self.assertEqual([json.loads(line)['id'] for line in self.output.read_text(encoding='utf-8').splitlines()], [1, 2])
 
     def test_repeat_exhaustion_preserves_previous_page_and_can_resume(self):
         self.fetch.return_value = self.page([1], 2)
@@ -204,7 +204,7 @@ class CollectorOptionsTests(unittest.TestCase):
         collect_to_jsonl(**self.args, max_pages_per_run=1)
         state = self.state()
         state['next_cursor'] = 1
-        self.checkpoint.write_text(json.dumps(state))
+        self.checkpoint.write_text(json.dumps(state), encoding='utf-8')
         self.fetch.reset_mock()
         with self.assertRaisesRegex(ValueError, 'no request was replayed'):
             collect_to_jsonl(**self.args, resume=True, max_cursor_repeats=3)
@@ -285,7 +285,7 @@ class ConfigCollectorTests(unittest.TestCase):
         self.client.request.side_effect = [Mock(json=Mock(return_value=p)) for p in payloads]
 
     def state(self):
-        return json.loads(self.checkpoint.read_text())
+        return json.loads(self.checkpoint.read_text(encoding='utf-8'))
 
     def snapshot(self):
         return self.output.read_bytes(), self.checkpoint.read_bytes()
@@ -303,7 +303,7 @@ class ConfigCollectorTests(unittest.TestCase):
     def test_cli_checkpoint_run_limit_and_resume_keep_config_total(self):
         self.config['max_pages'] = 2
         config_file = self.output.parent/'job.json'
-        config_file.write_text(json.dumps(self.config))
+        config_file.write_text(json.dumps(self.config), encoding='utf-8')
         self.checkpoint = self.output.parent/'state'/'custom.json'
         args = ['--config', str(config_file), '--output', str(self.output),
                 '--checkpoint', str(self.checkpoint), '--max-pages']
@@ -372,7 +372,7 @@ class ConfigCollectorTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'bool'):
                     run(self.config, output)
                 self.assertEqual(output.read_bytes(), b'')
-                self.assertEqual(json.loads(Path(str(output)+'.checkpoint.json').read_text())['pages'], 0)
+                self.assertEqual(json.loads(Path(str(output)+'.checkpoint.json').read_text(encoding='utf-8'))['pages'], 0)
         self.responses({'data': [], 'next': 'B'})
         with self.assertRaisesRegex(ValueError, 'has_more_path'):
             run(self.config, self.output)
@@ -389,7 +389,7 @@ class ConfigCollectorTests(unittest.TestCase):
                     self.responses(dict(data=items, more=True, **next_part))
                     with self.assertRaisesRegex(ValueError, 'next'):
                         run(self.config, output)
-                    state = json.loads(Path(str(output)+'.checkpoint.json').read_text())
+                    state = json.loads(Path(str(output)+'.checkpoint.json').read_text(encoding='utf-8'))
                     self.assertEqual((state['pages'], state['complete'], output.read_bytes()), (0, False, b''))
         self.config['pagination'] = {'mode': 'none'}
         self.responses({'data': [], 'more': True})
@@ -418,7 +418,7 @@ class ConfigCollectorTests(unittest.TestCase):
         self.responses({'data': [{'id': 999}], 'next': 'A'}, {'data': [{'id': 1}], 'next': None})
         result = run(self.config, self.output, max_pages_per_run=1)
         self.assertEqual((result['status'], result['pages'], result['items']), ('complete', 1, 1))
-        self.assertEqual(json.loads(self.output.read_text()), {'id': 1})
+        self.assertEqual(json.loads(self.output.read_text(encoding='utf-8')), {'id': 1})
         self.sleep.assert_called_once_with(0.2)
 
     def test_business_retries_wait_exactly_and_commit_only_success(self):
@@ -436,7 +436,7 @@ class ConfigCollectorTests(unittest.TestCase):
         self.assertEqual(self.sleep.call_args_list, [call(1.25), call(2.5)])
         self.assertEqual(self.client.request.call_args_list, [call('GET', self.config['url'], params={'cursor': 'B'})] * 3)
         self.assertEqual((result['status'], result['pages'], result['items']), ('complete', 2, 2))
-        self.assertEqual([json.loads(line)['id'] for line in self.output.read_text().splitlines()], [1, 2])
+        self.assertEqual([json.loads(line)['id'] for line in self.output.read_text(encoding='utf-8').splitlines()], [1, 2])
         self.client.close.assert_called()
 
     def test_business_marker_alone_rejects_items_and_can_retry_without_wait_path(self):
@@ -445,7 +445,7 @@ class ConfigCollectorTests(unittest.TestCase):
                        {'data': [{'id': 1}], 'next': None})
         result = run(self.config, self.output)
         self.assertEqual((result['pages'], result['items']), (1, 1))
-        self.assertEqual(json.loads(self.output.read_text()), {'id': 1})
+        self.assertEqual(json.loads(self.output.read_text(encoding='utf-8')), {'id': 1})
         self.sleep.assert_not_called()
 
     def test_business_retry_exhaustion_preserves_checkpoint(self):

@@ -29,6 +29,7 @@ def inspect(mode):
 
 
 if __name__=='__main__':
+    if hasattr(sys.stdout,'reconfigure'):sys.stdout.reconfigure(encoding='utf-8')
     parser=argparse.ArgumentParser()
     parser.add_argument('--mode',choices=['all','node','python','wasm','browser'],default='all')
     parser.add_argument('--json',action='store_true')

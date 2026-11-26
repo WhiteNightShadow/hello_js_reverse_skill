@@ -212,7 +212,7 @@ class BaselineIdentityTests(unittest.TestCase):
     def test_identities_survive_and_versions_default_to_the_skill(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            (root / 'sdk.js').write_text('v1')
+            (root / 'sdk.js').write_text('v1', encoding='utf-8')
             code, _, error = run(BASELINE, 'create', '--root', folder, '--files', 'sdk.js',
                                  '--identity', 'sdk_public=1.2.3', '--identity', 'impl_revision=v2')
             self.assertEqual(code, 0, error)
@@ -225,7 +225,7 @@ class BaselineIdentityTests(unittest.TestCase):
 
     def test_malformed_identity_is_rejected(self):
         with tempfile.TemporaryDirectory() as folder:
-            (Path(folder) / 'sdk.js').write_text('v1')
+            (Path(folder) / 'sdk.js').write_text('v1', encoding='utf-8')
             code, _, _ = run(BASELINE, 'create', '--root', folder, '--files', 'sdk.js', '--identity', 'broken')
             self.assertNotEqual(code, 0)
 

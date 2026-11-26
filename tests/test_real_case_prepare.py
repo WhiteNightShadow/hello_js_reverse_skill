@@ -107,10 +107,10 @@ class PreparationSecurityTests(unittest.TestCase):
         existing = self.root / "existing"
         existing.mkdir()
         marker = existing / "user-data"
-        marker.write_text("keep")
+        marker.write_text("keep", encoding="utf-8")
         with self.assertRaises(FileExistsError):
             prepare.prepare(existing)
-        self.assertEqual(marker.read_text(), "keep")
+        self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
         for path in (self.root / "missing/out", self.root / "../escape", TOOLS / "forbidden-output"):
             with self.subTest(path=path), self.assertRaises(ValueError):
                 prepare.validate_output(path)
@@ -167,12 +167,12 @@ class PreparationSecurityTests(unittest.TestCase):
     def test_recipes_are_fixed_and_do_not_bundle_upstream_or_acorn(self):
         for area in ("vm-cff", "crypto-fingerprint"):
             prepare.validate_lock(TOOLS / "templates" / area)
-        vm_package = json.loads((TOOLS / "templates/vm-cff/package.json").read_text())
+        vm_package = json.loads((TOOLS / "templates/vm-cff/package.json").read_text(encoding="utf-8"))
         self.assertNotIn("acorn", vm_package["dependencies"])
         forbidden = {"node_modules", "upstream", "vendor", "downloads", "samples", ".cache", "dist", "build"}
         for path in (TOOLS / "templates").rglob("*"):
             self.assertFalse(forbidden.intersection(path.relative_to(TOOLS / "templates").parts), str(path))
-        self.assertEqual(len(json.loads((TOOLS / "sources.json").read_text())), 4)
+        self.assertEqual(len(json.loads((TOOLS / "sources.json").read_text(encoding="utf-8"))), 4)
 
     def test_poisoned_build_environment_is_not_used(self):
         with patch.dict(os.environ, {"NODE_OPTIONS": "--require untrusted.js", "NODE_PATH": "outside",
@@ -185,9 +185,9 @@ class PreparationSecurityTests(unittest.TestCase):
 
     def test_cli_help_and_invalid_output_do_not_require_mcp_or_browser(self):
         for script in ("prepare.py", "validate.py"):
-            result = subprocess.run([sys.executable, "-B", str(TOOLS / script), "--help"], capture_output=True, text=True, timeout=10)
+            result = subprocess.run([sys.executable, "-B", str(TOOLS / script), "--help"], capture_output=True, text=True, encoding="utf-8", timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
-        result = subprocess.run([sys.executable, "-B", str(TOOLS / "prepare.py"), "--output", str(self.root)], capture_output=True, text=True, timeout=10)
+        result = subprocess.run([sys.executable, "-B", str(TOOLS / "prepare.py"), "--output", str(self.root)], capture_output=True, text=True, encoding="utf-8", timeout=10)
         self.assertEqual(result.returncode, 1)
         self.assertIn("Refusing to overwrite", result.stderr)
 

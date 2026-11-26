@@ -34,7 +34,25 @@ EXTRA_SITE_TERMS = ['tiktok', 'douyin', '抖音', '瑞数', 'akamai', 'cloudflar
                     'homefeed', 'fbejkbakrbadskfe', 'seccallback', 'sec_poison_id', 'websectiga',
                     'zmserbbohqt', '204431b8', '067e338b', 'webbuild', '6.62.0', 'web_session',
                     '300011', '/api/sns', '/api/sec/v1', '_auuxfeg27xa3x',
-                    '_0c6b9e549fef9ab9b4798ad1f12ea82b']
+                    '_0c6b9e549fef9ab9b4798ad1f12ea82b',
+                    'bytedance', 'jinritemai', 'haohuo', 'snssdk', 'mssdk', 'xiaodian', 'ecom-xiaodian',
+                    'staticv3', 'aweme', 'promotion/pack', 'pack/h5', 'trade/detail', 'views/product/item2',
+                    'fxgajaxstaticitem', 'ajaxitem', 'getgptgeneratedproductdesc', 'userproductnum',
+                    'getpayforms', 'detail/h5/sc', 'union/register', 'ttwid/check', 'getstock', 'cartnum',
+                    'mstoken', 'verifyfp', 's_v_web_id', 'a_bogus', 'unionhost', 'cburlprotocol', 'needfid',
+                    'migrate_info', 'migrate_priority', 'aid=1522', 'is_native_h5', 'is_new_h5_bff',
+                    'bff_type', 'detail_share', 'promotion_ids', 'isfromvideo', 'use_new_price', 'ui_params',
+                    'b_type_new', 'abparams', 'is_in_app', 'is_outside', 'hspc', 'top_notice_banner',
+                    '10001010a']
+LEGACY_NON_DESENSITIZED_CASES = {
+    'README.md',
+    '_template.md',
+    'historical-experience-rules.md',
+    'jsvmp-xhr-interceptor-env-emulation.md',
+    'jsvmp-ruishu6-cookie-412-sdenv.md',
+    'universal-vmp-source-instrumentation.md',
+    'jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox.md',
+}
 # Removed tools may only be named in the migration table and the old-rule index.
 TOOL_ALLOWED = {'mcp-tool-reference.md', 'mcp-tools.json', 'experience-rules-full.md'}
 STALE_TOOLS = ['add_init_script', 'bypass_debugger_trap', 'dump_jsvmp_strings', 'get_runtime_probe_log',
@@ -97,9 +115,21 @@ class GenericMethodTests(unittest.TestCase):
     def test_desensitized_cases_do_not_leak_site_terms(self):
         desensitized = [path for path in sorted((ROOT / 'cases').glob('*.md'))
                         if '平台类型：通用（已脱敏）' in read(path)]
-        self.assertGreaterEqual(len(desensitized), 6)
+        self.assertGreaterEqual(len(desensitized), 7)
         self.assert_absent(sorted(case_keywords()) + EXTRA_SITE_TERMS, desensitized,
                            'Desensitized cases must stay free of site/vendor terms:')
+
+    def test_all_new_cases_carry_desensitized_marker(self):
+        unmarked = [
+            path.name for path in sorted((ROOT / 'cases').glob('*.md'))
+            if path.name not in LEGACY_NON_DESENSITIZED_CASES
+            and '平台类型：通用（已脱敏）' not in read(path)
+        ]
+        self.assertFalse(
+            unmarked,
+            'Every non-legacy case in cases/ must be desensitized (平台类型：通用（已脱敏）): '
+            + ', '.join(unmarked),
+        )
 
     def test_private_terms_never_reach_published_files(self):
         if not PRIVATE_TERMS.exists():
