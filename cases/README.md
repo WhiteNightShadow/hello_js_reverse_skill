@@ -17,6 +17,7 @@
 | `acmescripts` / `/akam/` | 签名型（Akamai） | (待建) | (待建) |
 | `acw_sc__v2` / Aliyun WAF | 签名型 | (待建) | (待建) |
 | `FSSBBIl1UgzbN7N` / `_RSG` / 200KB 混淆 JS + 412 | 签名型（RS） | 同 nmpa 案例 | sdenv |
+| `www-hj.douyin.com` / `comment/list` / `s_v_web_id` / `verifyFp` / `bdms` | 行为型（同服务两接口强度不同：参数存在性门禁 vs 内容校验 + 验证中心凭证） | [`presence-gate-vs-verify-center-credential.md`](./presence-gate-vs-verify-center-credential.md) | 列表接口只判签名参数存在（随机/空值都过），子资源接口校验真伪且要凭证参数==同名 Cookie；签名参数归第二个 SDK 不归大 JSVMP 文件；签名绑完整 query 串；mock 拦截取未消费签名当控制组 |
 | `obfuscator.io` 特征（`_0x` 大量前缀） | 纯混淆线索 | (无专案，按当前问题选静态分析/四板斧步骤) | AST 反混淆与行为对照 |
 
 ### 使用方式
@@ -50,6 +51,7 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 | [per-build-polymorphic-vmp-and-composite-gate-ablation.md](per-build-polymorphic-vmp-and-composite-gate-ablation.md) | **[v3.16 新，已脱敏]** 按会话重编译多态 JSVMP、运行期窗口自证提密钥、`Error.stack` 跨引擎对齐与联合门禁金标准二分消融 | ★★★★★ | R3+R1：结构正则跨构建观测 + 运行期窗口频次与同次密文自证提密钥 + Step 0 自证与金标准折半消融 | 不分类 |
 | [eval-packer-unwrapping-and-multilayer-codec-separation.md](eval-packer-unwrapping-and-multilayer-codec-separation.md) | **[v3.17 新，已脱敏]** 动态 `eval` 打包壳脱壳、参数/信封/响应三层独立密钥域隔离、Latin-1 二次 UTF-8 膨胀判读与单次会话配额边界 | ★★★★ | R3+R1：离线沙箱接管动态入口脱壳 + `jsdom` 标定绑定会话与 UA 的流式信封 + 静态表与 `zlib` 响应解码 | 不分类 |
 | [custom-b64-envelope-dual-gen-vmp-and-container-disassembly.md](custom-b64-envelope-dual-gen-vmp-and-container-disassembly.md) | **[v3.17 新，已脱敏]** 自定义换表 Base64 明文 JSON 信封、双代 JSVMP 前缀判读、字节码容器（魔数/隐写掩码/前缀码常量池）拆解与 `jsdom` 离线出值 | ★★★★ | R3+R0：三层状态码分层归因 + `[i<<2,0,0]` 探针提表 + `setter` 捕获覆盖式全局容器 + 最小宿主容错离线运行原始实体 | 不分类 |
+| [presence-gate-vs-verify-center-credential.md](presence-gate-vs-verify-center-credential.md) | **[v3.18 新，已脱敏]** 同服务两条接口强度不同：一条只校验签名参数**是否存在**（随机/空值都过），另一条校验真伪且要求凭证参数为验证中心签发值（= 同名 Cookie）；含"把参数缺失误判成环境指纹"的高代价纠偏、mock 拦截取未消费签名、主世界/隔离世界差异 | ★★★☆☆ | R0（列表接口不生成）+ B/沙箱（子资源接口用 vm 跑原始 SDK 喂入-截出）+ 参数依赖消融定层 | 行为型（判据分层） |
 | [multi-entry-surface-triage-and-diagnostic-specificity.md](multi-entry-surface-triage-and-diagnostic-specificity.md) | **[v3.17.1 新，已脱敏]** 同实体多入口闸门与诊断显式度分离、控制组失效下的零字节静默拒绝判读、跨域匿名票据握手隔离与超长 URL 预览截断纠偏 | ★★★ | R6 基线核对 → 同实体跨入口判据对比 → 分离匿名票据与登录态前置依赖 | 不分类 |
 
 [historical-experience-rules.md](historical-experience-rules.md) 是 v3.10 之前的 30 条经验法则原文，含大量单站结论，只作历史追溯，每条的现状见 [旧规则去向](../references/experience-rules-full.md)。
@@ -62,6 +64,7 @@ AST 属性过滤同时约束方法调用，对象过滤支持 `this.bytecode` �
 |--------------|---------|--------|
 | `webmssdk` / `byted_acrawler` / `_SdkGlueInit` | jsvmp-xhr-interceptor-env-emulation 或 jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox | 高（需进一步区分） |
 | `cacheOpts` + `X-Gnarly` | jsvmp-dual-sign-xhr-intercept-cacheOpts-jsdom-firefox | 高（国际版双签名变体） |
+| 签名参数 ~190 字符 + 凭证参数==同名 Cookie + 同域两接口返回不同（200 空 body vs 有数据） | presence-gate-vs-verify-center-credential | 高（判据分层：参数存在性门禁 vs 内容校验） |
 | `a_bogus` + 192字符 + 无 `cacheOpts` | jsvmp-xhr-interceptor-env-emulation | 高（国内版单签名） |
 | `sdenv` / `FuckCookie` / 412 挑战 | jsvmp-ruishu6-cookie-412-sdenv | 高（RS） |
 | `while-switch` 分发循环 + 200KB+ 文件 | universal-vmp-source-instrumentation | 中（通用骨架） |
