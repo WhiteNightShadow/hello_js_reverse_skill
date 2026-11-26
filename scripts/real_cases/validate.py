@@ -44,16 +44,16 @@ def evaluation(value):
 
 def verify_assets(assets):
     require(assets.is_dir(), "--assets must be a prepared directory")
-    report = json.loads((assets / "PREPARE.json").read_text())
+    report = json.loads((assets / "PREPARE.json").read_text(encoding="utf-8"))
     require(report.get("schema") == "real-case-prepare-v1" and report.get("status") == "complete",
             "Asset preparation is not complete")
-    expected = json.loads((HERE / "sources.json").read_text())
+    expected = json.loads((HERE / "sources.json").read_text(encoding="utf-8"))
     sources = report.get("sources", [])
     require(len(sources) == len(expected), "Prepared upstream inventory differs")
     for pin, source in zip(expected, sources):
         require(all(source.get(k) == v for k, v in pin.items()), "Prepared source pins differ")
     verified = set()
-    for line in (assets / "SHA256SUMS").read_text().splitlines():
+    for line in (assets / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
         digest, name = line.split("  ", 1)
         member_parts(name)
         require(re.fullmatch(r"[0-9a-f]{64}", digest) is not None, "Invalid manifest hash")
@@ -87,7 +87,7 @@ def own_server(assets, work):
 async def evaluate(client, method):
     # A leading // comment after the native channel's `return` triggers ASI.
     # Keep the outer expression an explicit IIFE, with comments inside its body.
-    expression = "(async () => {\nconst suite = " + (HERE / "validate-browser.js").read_text() + f";\nreturn await suite.{method}();\n}})()"
+    expression = "(async () => {\nconst suite = " + (HERE / "validate-browser.js").read_text(encoding="utf-8") + f";\nreturn await suite.{method}();\n}})()"
     return evaluation(await client.call("evaluate_js", {"expression": expression, "world": "main"}))
 
 

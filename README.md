@@ -262,12 +262,13 @@ python main.py
 - **curl_cffi**: 带浏览器 TLS 指纹模拟的 HTTP 客户端
 
 ### 调试工具
-- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.13.0**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级 AST/结构正则插桩、`extract_script` 动态载荷提取与证据直落盘、按请求磁盘 Mock、Firefox 原生 RDP 正则断点调试与可选 Gecko 原生属性追踪）
+- **[camoufox-reverse MCP](https://github.com/WhiteNightShadow/camoufox-reverse-mcp) v1.13.1**: 反检测浏览器逆向分析（统一 API，含主世界/Frame Hook、源码级 AST/结构正则插桩、`extract_script` 动态载荷提取与证据直落盘、`list_network_requests` 超长 URL 截断标记、按请求磁盘 Mock、Firefox 原生 RDP 正则断点调试与可选 Gecko 原生属性追踪）
 
 ## 版本记录
 
 | 版本 | 日期 | 要点 |
 |------|------|------|
+| v3.17.1 | 2026-11-26 | 链路 A/B 补充响应诊断显式度（明示缺口文案 vs 0 字节/空壳/模糊码多因同象）与控制组先验分流，明确基线失效时优先核查登录态并对比同实体其他官方入口判据；同步 MCP v1.13.1 契约（`list_network_requests` / `wait_for` 的 `url_truncated` 预览标记）；新增通用脱敏案例并修复中文 Windows（GBK）下测试与脚本的 UTF-8 编码 |
 | v3.17.0 | 2026-11-24 | 新增动态 `eval` 打包壳脱壳、三层独立密钥域与二次 UTF-8 膨胀判读、`[i<<2,0,0]` 黑盒恢复自定义 Base64 表、多状态码门禁分层、双代 JSVMP 前缀与字节码容器拆解、空种子退化串 S1 断言及两篇脱敏案例；同步 MCP v1.13.0（43 个工具，含 `extract_script`、证据直落盘与死会话自愈） |
 | v3.16.0 | 2026-11-20 | 新增联合阈值门禁 Step 0 往返自证与金标准折半消融、多态字节码运行期窗口自证提密钥、`patchErrorStackFormat` 跨内核栈格式补丁与脱敏案例；同步 MCP v1.12.0（`inject`、`body_file`、跨刷新正则断点） |
 | v3.15.0 | 2026-11-18 | 新增 jsdom 子 Realm 原型链与 `toString`、自有/原型描述符对齐、`Document.prototype.all` 活性集合补丁；补充在线改写路由残留核查、定长码点流逐槽反解消融与脱敏案例，同步 MCP v1.11.1 快照 |
@@ -294,7 +295,7 @@ python main.py
 
 ## 社区贡献者
 
-- [@Moojing-jianchuan](https://github.com/Moojing-jianchuan) — 等长字节码流式变换与粗粒度布尔判决分层隔离（#8）、位打包双分发器定长槽位消融与 jsdom 原生性/子 Realm 校准（#9）、多态 JSVMP 窗口自证提密钥与联合门禁折半消融（#10）、动态 `eval` 脱壳与多层编解码/配额边界隔离（#12）、自定义 Base64 探针提表与双代 JSVMP 容器拆解（#13）实践案例，以及配套 MCP 的阶段插桩、源码正则插桩（`inject`）、`extract_script` 载荷脚本提取、通用证据落盘、死会话自愈与 Firefox RDP 断点调试共建
+- [@Moojing-jianchuan](https://github.com/Moojing-jianchuan) — 等长字节码流式变换与粗粒度布尔判决分层隔离（#8）、位打包双分发器定长槽位消融与 jsdom 原生性/子 Realm 校准（#9）、多态 JSVMP 窗口自证提密钥与联合门禁折半消融（#10）、动态 `eval` 脱壳与多层编解码/配额边界隔离（#12）、自定义 Base64 探针提表与双代 JSVMP 容器拆解（#13）、同实体多入口判据与诊断显式度分流（#14）实践案例，以及配套 MCP 的阶段插桩、源码正则插桩（`inject`）、`extract_script` 载荷脚本提取、通用证据落盘、URL 预览截断标记、死会话自愈与 Firefox RDP 断点调试共建
 
 ## 许可证
 

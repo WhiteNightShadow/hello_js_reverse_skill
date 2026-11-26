@@ -33,13 +33,13 @@ class Handler(BaseHTTPRequestHandler):
 class ScriptTests(unittest.TestCase):
     def test_baseline_create_check_change_missing_and_no_overwrite(self):
         with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);source=root/'sdk.js';source.write_text('v1')
+            root=Path(folder);source=root/'sdk.js';source.write_text('v1',encoding='utf-8')
             command=[sys.executable,str(ROOT/'scripts/project-baseline.py')]
-            def run(*args):return subprocess.run(command+list(args)+['--root',folder],capture_output=True,text=True)
+            def run(*args):return subprocess.run(command+list(args)+['--root',folder],capture_output=True,text=True,encoding='utf-8')
             self.assertEqual(run('create','--files','sdk.js').returncode,0)
             self.assertEqual(run('check').returncode,0)
             self.assertNotEqual(run('create','--files','sdk.js').returncode,0)
-            source.write_text('v2')
+            source.write_text('v2',encoding='utf-8')
             result=run('check');self.assertEqual(result.returncode,1)
             self.assertEqual(json.loads(result.stdout)['changed'],['sdk.js'])
             source.unlink();self.assertEqual(json.loads(run('check').stdout)['missing'],['sdk.js'])
@@ -67,13 +67,13 @@ class ScriptTests(unittest.TestCase):
                         output=Path(folder)/(mode+'.jsonl')
                         result=collect.run(config,output)
                         self.assertEqual(result['status'],'complete')
-                        self.assertEqual([json.loads(line)['id'] for line in output.read_text().splitlines()],[1,2,3])
+                        self.assertEqual([json.loads(line)['id'] for line in output.read_text(encoding='utf-8').splitlines()],[1,2,3])
         finally:
             server.shutdown();server.server_close();thread.join(timeout=2)
 
     def test_legacy_node_test_entrypoints_stay_offline(self):
         for name in ('node-request','vm-sandbox','wasm-loader','browser-auto','env-bundle'):
-            result=subprocess.run(['node',str(ROOT/'templates'/name/'main.js'),'--test'],capture_output=True,text=True,timeout=10)
+            result=subprocess.run(['node',str(ROOT/'templates'/name/'main.js'),'--test'],capture_output=True,text=True,encoding='utf-8',timeout=10)
             self.assertEqual(result.returncode,0,result.stderr)
 
 

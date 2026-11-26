@@ -35,8 +35,9 @@ MCP v1.7.0 能力（调用前通过当前工具 schema 确认）：
 - 网络列表旧 `size` 是字符数，`body_bytes` 才是保存的正文实体字节数；详情 `response_body_total_bytes` 也是解压后的实体字节，不直接与压缩 Content-Length 比较。
 - 大段源码/二进制优先保存后本地分析；模型只读摘要、相关片段和验证结果。WASM 需校验文件哈希、imports/exports 和真实调用，不能仅凭文件名/截图判定成功。
 
-MCP v1.13.0 证据直落盘与死会话自愈边界：
+MCP v1.13.0 / v1.13.1 证据直落盘、URL 预览截断标记与死会话自愈边界：
 
+- `list_network_requests`（及 `wait_for(mode="request"|"auto")` 的 `request` 摘要）中的 `url` 仅为上限 200 字符的预览：MCP v1.13.1 起超过 200 字符时末尾追加 `…` 并置 `url_truncated=True`、`url_length=<完整字符数>`（`url_filter` 与 `url_contains_domain` 仍对完整原始 URL 匹配）。严禁根据被截断的列表预览推断请求“未携带某查询参数、签名或令牌”，核对 URL 参数前必须先调用 `get_network_request(request_id=...)` 获取完整 URL。
 - `extract_script(request_id=..., json_path=..., output_file=...)` 用于提取经异步接口返回再 `eval` 的动态脚本（无 `<script src>` 资源）；默认 `allow_partial=False` 会拒绝被 `max_body_size` 截断的响应体，遇到报错应调大 `network_capture(max_body_size=...)` 重采而非带残缺半截脚本继续分析。
 - `evaluate_js(..., output_file=..., output_encoding="utf8"|"base64")` 适合将运行期解出的大字符串或字节数组（在页面侧转 Base64）直接原子落盘，仅返回短预览与 `sha256`；传入 `cookies(action="header", output_file=...)` 时文件以 `0600` 权限落盘且返回 `header=None`，避免长凭据暴露到对话记录。
 - `wait_for(url_pattern=..., mode="request", after_id=...)` 会等待匹配请求及其响应体收尾（非 `pending`）后再返回，可安全衔接 `save_response_body` 或 `extract_script`。

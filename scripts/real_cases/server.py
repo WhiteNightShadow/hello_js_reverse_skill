@@ -14,7 +14,7 @@ def make_server(assets, work):
     from Crypto.Util.Padding import pad, unpad
     ROOT=Path(assets).resolve()
     RUNTIME=Path(work).resolve();RUNTIME.mkdir(exist_ok=True)
-    KEYS=json.loads((ROOT/'crypto-fingerprint/samples/demo-keys.json').read_text())
+    KEYS=json.loads((ROOT/'crypto-fingerprint/samples/demo-keys.json').read_text(encoding='utf-8'))
     FIELDS=['v','alg','keyId','direction','requestId','method','path','ts','nonce','challengeId','fingerprint','iv','ciphertext']
     CONTEXT=['direction','requestId','method','path','nonce','challengeId','fingerprint']
     CHALLENGES={};NONCES={};LOCK=threading.Lock();TTL=120000;SKEW=30000
@@ -100,7 +100,7 @@ def make_server(assets, work):
             self.send_header('Content-Security-Policy',"default-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:")
             self.end_headers();self.wfile.write(body)
             with LOCK:
-                with (RUNTIME/'http.jsonl').open('a') as f:f.write(json.dumps({'t':time.time(),'method':self.command,'path':self.path,'status':status,'body_sha256':hashlib.sha256(body).hexdigest()},ensure_ascii=True)+'\n')
+                with (RUNTIME/'http.jsonl').open('a',encoding='utf-8') as f:f.write(json.dumps({'t':time.time(),'method':self.command,'path':self.path,'status':status,'body_sha256':hashlib.sha256(body).hexdigest()},ensure_ascii=True)+'\n')
         def do_GET(self):
             path=self.path.split('?')[0]
             if path=='/blank':return self.send(200,b'<!doctype html><button id="noop">empty control</button>','text/html; charset=utf-8')
